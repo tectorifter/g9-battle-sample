@@ -1,0 +1,31 @@
+{
+  "id": "g9-battle-sample",
+  "name": "g9-battle-sample",
+  "version": "0.3.0",
+  "api": 2,
+  "entry": "main.lua",
+  "profile": "content",
+  "game_version": ">=0.1.45",
+  "games": [
+    "gen1",
+    "gen2"
+  ],
+  "category": "GAMEPLAY",
+  "priority": 100,
+  "permissions": [
+    "engine_internals"
+  ],
+  "dependencies": [
+    "g9-battle-engine",
+    "g9-Battle-Scene"
+  ],
+  "optional_dependencies": [
+    "national_dex"
+  ],
+  "description": "Wild battles of 10%/2%/1% bands to 'doubles'/'triples'/'hordes' and a 0.5% 'bossFight' band (x1-x5 max HP, random boss protections). Every 2+-mon trainer battle routes to 'doubles', the Elite Four roll doubles-or-triples, and the Champion and Red route to 'bossFight'. Options add a trainer difficulty preset (easy/normal/hard/hell) and two toggles -- RAND WILDS and RAND TRAINER MONS -- which re-roll species to type-matching, BST-equivalent ones from the registered national dex",
+  "options_schema": "options.lua",
+  "experimental": false,
+  "repo": "",
+  "conflicts": [],
+  "incompatible": []
+}
