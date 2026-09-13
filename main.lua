@@ -93,12 +93,33 @@
 --   5. A DIFFICULTY PRESET for every trainer's mons (easy / normal / hard /
 --      hell), fed through the engine's own registerTrainerStatsProvider API
 --      -- one registration covers both generations.
+--   6. A TRAINER-TEAM FLOOR tied to that same DIFFICULTY setting: EASY keeps
+--      the vanilla team size, NORMAL is 2, HARD is 4 and HELL is 6, and
+--      Pokemon are only ever ADDED when the vanilla team is under the floor
+--      (a 5-mon team stays 5 on hard and becomes 6 on hell).  Each added mon
+--      is modelled on one of the team's own members, at that member's level,
+--      through the same species matcher the randomizer uses.
 -- All of this is gated by this mod's options.lua (DIFFICULTY, RAND WILDS,
 -- RAND TRAINER MONS), read lazily at battle/encounter time so the Mod
 -- Manager changes take effect without a reload.
-local function installRandomizer(mod)
+local function installRandomizer(mod, gen)
   local shared = {}
   local unpack = table.unpack or unpack
+
+  -- The running game's generation (1 or 2).  The arm chooser at the bottom
+  -- already worked it out and passes it in; recomputed here only when this
+  -- is called without one (the test harness does), so an added mon is built
+  -- through the right constructor for the game actually running.
+  local gameGen = 1
+  if gen == 1 or gen == 2 then
+    gameGen = gen
+  else
+    local okGV, GameVersion = pcall(require, "src.core.GameVersion")
+    if okGV and GameVersion and GameVersion.generation then
+      local okGen, value = pcall(GameVersion.generation)
+      if okGen and (value == 1 or value == 2) then gameGen = value end
+    end
+  end
 
   -- ---------------------------------------------------------------- options
   -- The SAME schema options.lua returns (kept in sync by hand, exactly like
@@ -113,7 +134,7 @@ local function installRandomizer(mod)
       default = "normal",
       choices = { { "EASY", "easy" }, { "NORMAL", "normal" },
                   { "HARD", "hard" }, { "HELL", "hell" } },
-      description = "Every trainer's Pokemon. EASY: 0 IVs, 0 EVs, neutral natures. NORMAL: 10 IVs, 12 EVs, neutral. HARD: 20 IVs, 24 EVs, a nature favouring the highest base stat. HELL: 31 IVs, 252 EVs on the two highest base stats and 4 on the third, a nature that boosts the highest stat and lowers the weaker offence.",
+      description = "Every trainer's Pokemon, and their team size. EASY: vanilla team size, 0 IVs, 0 EVs, neutral natures. NORMAL: at least 2 Pokemon, 10 IVs, 12 EVs, neutral. HARD: at least 4 Pokemon, 20 IVs, 24 EVs, a nature favouring the highest base stat. HELL: at least 6 Pokemon, 31 IVs, 252 EVs on the two highest base stats and 4 on the third, a nature that boosts the highest stat and lowers the weaker offence. A team is only ever grown when the vanilla one is smaller than the setting's floor.",
     },
     {
       key = "rand_wilds",
@@ -428,6 +449,97 @@ local function installRandomizer(mod)
     return out
   end
 
+  -- ------------------------------------------------- trainer team minimums
+  -- The DIFFICULTY setting ALSO sets a floor on a trainer's team size
+  -- (explicit user request, 2026-09-13): EASY keeps the vanilla quantity,
+  -- NORMAL is 2, HARD is 4, HELL is 6.  Pokemon are only ever ADDED when the
+  -- vanilla team is under that floor -- a trainer with 5 mons keeps all 5 on
+  -- hard and gets exactly one more on hell.  Every added mon is modelled on
+  -- one of the team's own members, at THAT member's level, with the same
+  -- species rules the randomizer already uses (the type/BST matcher when
+  -- RAND TRAINER MONS is on, the template's own species when it is off), so
+  -- a padded team is level-matched and obeys the mod's rules.  This is a
+  -- DIFFICULTY feature, not a randomization one, so it applies with RAND
+  -- TRAINER MONS off too.
+  local MIN_TEAM = { easy = 0, normal = 2, hard = 4, hell = 6 }
+  local function minTeamSize() return MIN_TEAM[difficulty()] or 0 end
+
+  -- A numeric level off a template member, falling back to the first level
+  -- in the party and then to 5, so a row without one still gets a sane mon.
+  local function teamLevel(template, party)
+    if type(template) == "table" and type(template.level) == "number" then
+      return template.level
+    end
+    for i = 1, #party do
+      local l = party[i] and party[i].level
+      if type(l) == "number" then return l end
+    end
+    return 5
+  end
+
+  -- One ADDITIONAL member modelled on `template`.  A real Mon object (the
+  -- Gen 2 arm's parties, and a built Gen 1 enemyParty) gets a real mon back
+  -- through the running game's own constructor; the plain
+  -- {species, level, moves?} ROWS Gen 1's party builder feeds the hook get a
+  -- row back.  Returns nil when nothing can be built.
+  local function buildExtraMember(data, template, party)
+    if type(template) ~= "table" then return nil end
+    local level = teamLevel(template, party)
+    local newId = template.species
+    if randTrainersOn() and buildPool(data) then
+      newId = pickSpecies(template.species, level) or template.species
+    end
+    if type(newId) ~= "string" then return nil end
+    if type(template.stats) == "table" or type(template.dvs) == "table" then
+      local mon
+      if gameGen == 2 then
+        mon = rebuildGen2Mon(data, newId, template)
+      else
+        local ok, Pokemon = pcall(require, "src.pokemon.Pokemon")
+        if ok and type(Pokemon) == "table"
+            and type(Pokemon.new) == "function" then
+          local okNew, built = pcall(Pokemon.new, data or liveData(), newId,
+            level)
+          if okNew and type(built) == "table" then mon = built end
+        end
+      end
+      -- A mon the running game cannot rebuild is left out rather than
+      -- downgraded to a row (a row where a mon was expected would break the
+      -- party builder).
+      if type(mon) ~= "table" then return nil end
+      mon.__g9sampleRand = true
+      return mon
+    end
+    local copy = {}
+    for k, v in pairs(template) do copy[k] = v end
+    copy.species = newId
+    copy.level = level
+    copy.moves = nil
+    copy.__g9sampleRand = true
+    return copy
+  end
+
+  -- Pad a trainer party up to the difficulty floor.  Returns the SAME array
+  -- when it already qualifies -- identity preserved for the engine's own
+  -- stat passes -- and a fresh one otherwise.
+  function shared.padTrainerParty(party, data)
+    if type(party) ~= "table" or #party == 0 then return party end
+    local want = minTeamSize()
+    if want <= #party then return party end
+    data = data or liveData()
+    local out = {}
+    for i = 1, #party do out[i] = party[i] end
+    while #out < want do
+      local template = party[love.math.random(1, #party)]
+      local mon = buildExtraMember(data, template, party)
+      if not mon then break end
+      out[#out + 1] = mon
+    end
+    if #out == #party then return party end
+    return out
+  end
+  shared.minTeamSize = minTeamSize
+
   mod.hooks:wrap("encounter.species", function(nextFn, enc, ctx)
     local rolled = nextFn(enc, ctx)
     if not randWildsOn() then return rolled end
@@ -444,7 +556,9 @@ local function installRandomizer(mod)
 
   mod.hooks:wrap("trainer.party", function(nextFn, classId, memberId, party)
     local result = nextFn(classId, memberId, party)
-    return shared.randomizeParty(result)
+    -- Difficulty team floor first, then the species swap (added mons are
+    -- tagged, so the swap leaves them exactly as built).
+    return shared.randomizeParty(shared.padTrainerParty(result))
   end, 0)
 
   -- ------------------------------------------------- combat-type routing
@@ -523,8 +637,9 @@ local function installRandomizer(mod)
   shared.pickSpecies = pickSpecies
   shared.buildPool = buildPool
   mod.log:info("g9_battle_sample: randomizer/difficulty systems installed "
-    .. "(difficulty=%s, rand_wilds=%s, rand_trainers=%s)",
-    difficulty(), tostring(randWildsOn()), tostring(randTrainersOn()))
+    .. "(difficulty=%s, min team=%d, rand_wilds=%s, rand_trainers=%s)",
+    difficulty(), minTeamSize(), tostring(randWildsOn()),
+    tostring(randTrainersOn()))
   return shared
 end
 
@@ -568,7 +683,7 @@ local function installGen2(mod, shared)
   -- payout.
   local function tryDoublesTrainer(self, opts)
     if not (opts and opts.trainer and type(opts.trainer.party) == "table"
-        and #opts.trainer.party >= 2) then
+        and #opts.trainer.party >= 1) then
       return false
     end
     -- Defer entirely to a trainer explicitly registered via
@@ -600,11 +715,13 @@ local function installGen2(mod, shared)
     -- the scene does not actually ship refuses below and falls back to the
     -- ordinary trainer battle, exactly as before.
     -- The scene renders payload.enemies, not battle.enemyParty, so the swap
-    -- has to happen HERE (before the push) for a scene trainer battle; the
-    -- swapped mons are tagged, so the trainer.party hook Battle.new calls
-    -- moments later leaves them exactly as they are -- and the engine's own
-    -- difficulty pass then lands on the very mons the screen is drawing.
-    opts.trainer.party = shared.randomizeParty(opts.trainer.party)
+    -- and the difficulty team floor both have to happen HERE (before the
+    -- push) for a scene trainer battle; the swapped mons are tagged, so the
+    -- trainer.party hook Battle.new calls moments later leaves them exactly
+    -- as they are -- and the engine's own difficulty pass then lands on the
+    -- very mons the screen is drawing.
+    opts.trainer.party = shared.randomizeParty(
+      shared.padTrainerParty(opts.trainer.party))
     local classId = opts.trainer.classId or opts.trainer.class
     local layoutName = shared.layoutForClass(classId)
     local layoutData = exportMod.exports.getLayoutData
@@ -994,7 +1111,19 @@ local function installGen1(mod, shared)
 
     if isTrainer then
       local team = battle.enemyParty
-      if type(team) ~= "table" or #team < 2 then return false end
+      if type(team) ~= "table" then return false end
+      -- Difficulty team floor (see installRandomizer's own note).  The hook
+      -- may already have padded the rows this party was built from; padding
+      -- again here is a no-op when it did.  The padded array replaces the
+      -- battle's enemyParty in place, so both the model and the scene's own
+      -- Gen 1 battlers -- built from exactly these mon tables -- see the
+      -- additions.
+      local padded = shared.padTrainerParty(team)
+      if padded ~= team then
+        battle.enemyParty = padded
+        team = padded
+      end
+      if #team < 2 then return false end
       -- Defer entirely to a trainer explicitly registered through
       -- g9-battle-engine's own mod.exports.registerTrainer -- that
       -- registration's own combatType is the one real authority for what it
@@ -1222,7 +1351,7 @@ return function(mod)
   -- The generation-agnostic systems (species randomizer, difficulty
   -- provider, combat-type routing helpers) install first, whatever the
   -- generation -- both arms consume the same `shared` table.
-  local shared = installRandomizer(mod)
+  local shared = installRandomizer(mod, gen)
   if gen == 2 then
     return installGen2(mod, shared)
   end

@@ -20,7 +20,7 @@ return {
     default = "normal",
     choices = { { "EASY", "easy" }, { "NORMAL", "normal" },
                 { "HARD", "hard" }, { "HELL", "hell" } },
-    description = "Every trainer's Pokemon. EASY: 0 IVs, 0 EVs, neutral natures. NORMAL: 10 IVs, 12 EVs, neutral. HARD: 20 IVs, 24 EVs, a nature favouring the highest base stat. HELL: 31 IVs, 252 EVs on the two highest base stats and 4 on the third, a nature that boosts the highest stat and lowers the weaker offence.",
+    description = "Every trainer's Pokemon, and their team size. EASY: vanilla team size, 0 IVs, 0 EVs, neutral natures. NORMAL: at least 2 Pokemon, 10 IVs, 12 EVs, neutral. HARD: at least 4 Pokemon, 20 IVs, 24 EVs, a nature favouring the highest base stat. HELL: at least 6 Pokemon, 31 IVs, 252 EVs on the two highest base stats and 4 on the third, a nature that boosts the highest stat and lowers the weaker offence. A team is only ever grown when the vanilla one is smaller than the setting's floor.",
   },
   {
     key = "rand_wilds",
