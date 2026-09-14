@@ -1,7 +1,7 @@
 {
   "id": "g9-battle-sample",
   "name": "g9-battle-sample",
-  "version": "0.4.0",
+  "version": "0.8.2",
   "api": 2,
   "entry": "main.lua",
   "profile": "content",
@@ -22,10 +22,10 @@
   "optional_dependencies": [
     "national_dex"
   ],
-  "description": "Wild battles of 10%/2%/1% bands to 'doubles'/'triples'/'hordes' and a 0.5% 'bossFight' band (x1-x5 max HP, random boss protections). Every 2+-mon trainer battle routes to 'doubles', the Elite Four roll doubles-or-triples, and the Champion and Red route to 'bossFight'. Options add a trainer difficulty preset (easy/normal/hard/hell) and two toggles -- RAND WILDS and RAND TRAINER MONS -- which re-roll species to type-matching, BST-equivalent ones from the registered national dex",
+  "description": "randomizer, boss fights config, pokemon trainer screen, rebattles.",
   "options_schema": "options.lua",
   "experimental": false,
-  "repo": "",
+  "github": "https://github.com/tectorifter/g9-battle-sample",
   "conflicts": [],
   "incompatible": []
 }
