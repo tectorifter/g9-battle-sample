@@ -1,3 +1,4 @@
 Trainer randomizer by matching type, bst and level (based on dex + expansions).
 Wild encounter species randomizer by matching bst and type of vanilla encounter table (based on dex + expansions).
-Difficulty Increase Easy = 0 IVs 0 EVs / Normal = 10 IVs, 12 EVs all stats / Hard = 20 IVs, 24 EVs all stats and favorable nature based on highest base stat / hell 31 IVs all stats, 252 EVs to highest base stats and favorable nature that is negative on lowest offensive stat. 
+Difficulty Increase Easy = 0 IVs 0 EVs / Normal = 10 IVs, 12 EVs all stats / Hard = 20 IVs, 24 EVs all stats and favorable nature based on highest base stat / hell 31 IVs all stats, 252 EVs to highest base stats and favorable nature that is negative on lowest offensive stat.
+Many new added utilities in settings.
