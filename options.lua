@@ -14,6 +14,13 @@
 -- Labels are kept short -- the manager's row layout truncates long ones.
 return {
   {
+    key = "battle_scene",
+    label = "BATTLE SCENE",
+    type = "toggle",
+    default = true,
+    description = "ON (default): wild encounters and trainer battles render through the g9-Battle-Scene mod's custom layouts -- every wild fight takes singles, doubles, triples, hordes or the 0.5% bossFight, and a trainer fight picks doubles, triples or bossFight from the enemy battle that already exists (the Elite Four roll doubles-or-triples, Champion/Red and wild_forms's Eternatus are bossFight, a one-mon team takes the scene's singles screen, everyone else doubles). OFF: the game's own native battle screen runs instead, for Gen 1 and Gen 2 respectively, for EVERY fight -- wild, trainer and rematch alike -- and g9-Battle-Scene is never used, so it can be left disabled or uninstalled.",
+  },
+  {
     key = "difficulty",
     label = "DIFFICULTY",
     type = "choice",
@@ -27,14 +34,14 @@ return {
     label = "RAND WILDS",
     type = "toggle",
     default = true,
-    description = "ON (default): an ordinary wild encounter's species is re-rolled to a random species that shares a type with it and whose base-stat total is within -5% to +(5*level)% of the original's. The random LAYOUT bands (hordes/triples/doubles/singles, and the 0.5% bossFight) stay on either way.",
+    description = "ON (default): an ordinary wild encounter's species is re-rolled to a random species that shares a type with it and whose base-stat total is within -5% to +(5*level)% of the original's. A WATER encounter (surfing or fishing) only re-rolls into a WATER- or FLYING-type species -- water areas are water-and-flying exclusive -- while a LAND or CAVE encounter bans WATER types (a FLYING type is welcome anywhere). Every randomised species is pushed to the latest evolution its level allows -- a level-up evolution needs its own level, a trade one needs level 40, a STONE evolution appears in the wild only from level 35, and a HELD-ITEM or HAPPINESS evolution appears from level 35 too (or level 25 when the mon evolving is a BABY, e.g. Happiny's Chansey) -- and a legendary is only ever picked at level 45 or higher. A blacklisted species (the BLACKLIST row on the OPTIONS menu) is never picked at all -- MEGA and GIGANTAMAX forms are delisted out of the box, and the window's own [MEGA] [GIGA] row flips either whole group at once. The random LAYOUT bands (hordes/triples/doubles/singles, and the 0.5% bossFight) stay on either way.",
   },
   {
     key = "rand_trainers",
     label = "RAND TRAINER MONS",
     type = "toggle",
     default = true,
-    description = "ON (default): every trainer, gym leader, Elite Four, Champion and rival has each party Pokemon swapped for a random species sharing at least one type and of equivalent BST (within -5% to +(5*level)%). OFF: trainer teams keep their real species.",
+    description = "ON (default): every trainer, gym leader, Elite Four, Champion and rival has each party Pokemon swapped for a random species sharing at least one type and of equivalent BST (within -5% to +(5*level)%). Each swap is pushed to the latest evolution its level allows (trade/item/held-item/friendship evolutions from level 40 -- a trainer's roster keeps the level-40 gate, not the wild's 35/25), a legendary is only ever chosen at level 45 or higher, and a blacklisted species (Mega and Gigantamax forms are delisted by default) is never chosen at all. OFF: trainer teams keep their real species.",
   },
   {
     key = "item_randomizer",
@@ -61,26 +68,26 @@ return {
   },
   {
     key = "rebattles",
-    label = "REBATTLES",
+    label = "REMATCHES",
     type = "toggle",
     default = false,
-    description = "ON: a trainer you have already beaten can be fought again -- press A on them (the ordinary way you would talk to anyone) to start a rematch. It only ever starts on your own press, so a beaten trainer can never re-challenge you by itself as you walk past. Their dialogue, payout and any badge/TM reward stay exactly as they were (a reward is never paid twice), and a trainer whose talk is a hand-ported story scene -- a rival, the Rocket hideout, a gym leader's own line -- is deliberately left alone, so no story flag can be set out of order. Works on both Red/Blue/Yellow and Gold/Silver/Crystal.",
+    description = "ON: a trainer you have already beaten can be fought again. Press A on them (the ordinary way you would talk to anyone) and they will ask whether you want to battle again: YES starts a rematch, NO carries on with their usual after-battle line, exactly as if you had never asked. It only ever starts on your own press, so a beaten trainer can never re-challenge you by itself as you walk past. Their dialogue, payout and any badge/TM reward stay exactly as they were (a reward is never paid twice), and a trainer whose talk is a hand-ported story scene -- a rival, the Rocket hideout, a gym leader's own line -- is deliberately left alone, so no story flag can be set out of order. Works on both Red/Blue/Yellow and Gold/Silver/Crystal.",
   },
   {
     key = "rebattle_levels",
-    label = "+LEVEL PER REBATTLE",
+    label = "+LEVEL PER REMATCH",
     type = "choice",
     default = "off",
     choices = { { "OFF", "off" }, { "+1", "1" }, { "+2", "2" },
                 { "+4", "4" }, { "+8", "8" }, { "+16", "16" } },
-    description = "Every rematch (see REBATTLES) puts this many levels on each Pokemon in the trainer's team, cumulatively: the first fight is vanilla, the second is +this, the third +2x this, and so on. Only ever raises a level -- never a level cap or a species change of its own -- and it stacks with the DIFFICULTY team-size floor and with RAND TRAINER MONS. OFF leaves every team at its real level.",
+    description = "Every rematch (see REMATCHES) puts this many levels on each Pokemon in the trainer's team, cumulatively: the first fight is vanilla, the second is +this, the third +2x this, and so on. Only ever raises a level -- never a level cap or a species change of its own -- and it stacks with the DIFFICULTY team-size floor and with RAND TRAINER MONS. OFF leaves every team at its real level.",
   },
   {
     key = "trainer_item_drop",
     label = "TRAINER ITEM DROP",
     type = "toggle",
     default = false,
-    description = "ON: beating a trainer -- a first fight or a rematch (see REBATTLES) -- can drop one random NON-KEY item (drawn from the game's whole item list, same pool as ITEM RANDOMIZER) into your bag, shown as an ordinary \"{PLAYER} found X!\" box the moment you are back on the map. Key items are never dropped. If the bag pocket is full the item is quietly lost rather than shown, exactly as a real pickup would be. Works on both generations.",
+    description = "ON: beating a trainer -- a first fight or a rematch (see REMATCHES) -- can drop one random NON-KEY item (drawn from the game's whole item list, same pool as ITEM RANDOMIZER) into your bag, shown as an ordinary \"{PLAYER} found X!\" box the moment you are back on the map. Key items are never dropped. If the bag pocket is full the item is quietly lost rather than shown, exactly as a real pickup would be. Works on both generations.",
   },
   {
     key = "trainer_item_chance",
@@ -89,6 +96,6 @@ return {
     default = "100",
     choices = { { "5%", "5" }, { "10%", "10" }, { "20%", "20" },
                 { "40%", "40" }, { "80%", "80" }, { "100%", "100" } },
-    description = "The chance that beating a trainer -- a first fight or a rematch (see REBATTLES) -- actually pays out the TRAINER ITEM DROP: 5%, 10%, 20%, 40%, 80% or 100% (default) of wins. Rolled once per win, so it only ever changes how often the drop happens, never which item. Only read while TRAINER ITEM DROP is on, and a key item is never dropped whatever the roll.",
+    description = "The chance that beating a trainer -- a first fight or a rematch (see REMATCHES) -- actually pays out the TRAINER ITEM DROP: 5%, 10%, 20%, 40%, 80% or 100% (default) of wins. Rolled once per win, so it only ever changes how often the drop happens, never which item. Only read while TRAINER ITEM DROP is on, and a key item is never dropped whatever the roll.",
   },
 }

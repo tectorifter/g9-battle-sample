@@ -102,6 +102,11 @@
 -- All of this is gated by this mod's options.lua (DIFFICULTY, RAND WILDS,
 -- RAND TRAINER MONS), read lazily at battle/encounter time so the Mod
 -- Manager changes take effect without a reload.
+-- A tenth option, BATTLE SCENE, gates the WHOLE custom-scene layer instead
+-- (see its own row in the define() table below): with it OFF every wild
+-- encounter and trainer battle goes to the game's own native battle screen,
+-- for Gen 1 and Gen 2 respectively, and g9-Battle-Scene is never consulted --
+-- which is why it is now an optional dependency rather than a hard one.
 local function installRandomizer(mod, gen)
   local shared = {}
   local unpack = table.unpack or unpack
@@ -128,6 +133,13 @@ local function installRandomizer(mod, gen)
   -- defaults from this define() call at load time).
   mod.options:define({
     {
+      key = "battle_scene",
+      label = "BATTLE SCENE",
+      type = "toggle",
+      default = true,
+      description = "ON (default): wild encounters and trainer battles render through the g9-Battle-Scene mod's custom layouts -- every wild fight takes singles, doubles, triples, hordes or the 0.5% bossFight, and a trainer fight picks doubles, triples or bossFight from the enemy battle that already exists (the Elite Four roll doubles-or-triples, Champion/Red and wild_forms's Eternatus are bossFight, a one-mon team takes the scene's singles screen, everyone else doubles). OFF: the game's own native battle screen runs instead, for Gen 1 and Gen 2 respectively, for EVERY fight -- wild, trainer and rematch alike -- and g9-Battle-Scene is never used, so it can be left disabled or uninstalled.",
+    },
+    {
       key = "difficulty",
       label = "DIFFICULTY",
       type = "choice",
@@ -141,14 +153,14 @@ local function installRandomizer(mod, gen)
       label = "RAND WILDS",
       type = "toggle",
       default = true,
-      description = "ON (default): an ordinary wild encounter's species is re-rolled to a random species that shares a type with it and whose base-stat total is within -5% to +(5*level)% of the original's. The random LAYOUT bands (hordes/triples/doubles/singles, and the 0.5% bossFight) stay on either way.",
+      description = "ON (default): an ordinary wild encounter's species is re-rolled to a random species that shares a type with it and whose base-stat total is within -5% to +(5*level)% of the original's. A WATER encounter (surfing or fishing) only re-rolls into a WATER- or FLYING-type species -- water areas are water-and-flying exclusive -- while a LAND or CAVE encounter bans WATER types (a FLYING type is welcome anywhere). Every randomised species is pushed to the latest evolution its level allows -- a level-up evolution needs its own level, a trade one needs level 40, a STONE evolution appears in the wild only from level 35, and a HELD-ITEM or HAPPINESS evolution appears from level 35 too (or level 25 when the mon evolving is a BABY, e.g. Happiny's Chansey) -- and a legendary is only ever picked at level 45 or higher. A blacklisted species (the BLACKLIST row on the OPTIONS menu) is never picked at all -- MEGA and GIGANTAMAX forms are delisted out of the box, and the window's own [MEGA] [GIGA] row flips either whole group at once. The random LAYOUT bands (hordes/triples/doubles/singles, and the 0.5% bossFight) stay on either way.",
     },
     {
       key = "rand_trainers",
       label = "RAND TRAINER MONS",
       type = "toggle",
       default = true,
-      description = "ON (default): every trainer, gym leader, Elite Four, Champion and rival has each party Pokemon swapped for a random species sharing at least one type and of equivalent BST (within -5% to +(5*level)%). OFF: trainer teams keep their real species.",
+      description = "ON (default): every trainer, gym leader, Elite Four, Champion and rival has each party Pokemon swapped for a random species sharing at least one type and of equivalent BST (within -5% to +(5*level)%). Each swap is pushed to the latest evolution its level allows (trade/item/held-item/friendship evolutions from level 40 -- a trainer's roster keeps the level-40 gate, not the wild's 35/25), a legendary is only ever chosen at level 45 or higher, and a blacklisted species (Mega and Gigantamax forms are delisted by default) is never chosen at all. OFF: trainer teams keep their real species.",
     },
     {
       key = "item_randomizer",
@@ -175,26 +187,26 @@ local function installRandomizer(mod, gen)
     },
     {
       key = "rebattles",
-      label = "REBATTLES",
+      label = "REMATCHES",
       type = "toggle",
       default = false,
-      description = "ON: a trainer you have already beaten can be fought again -- press A on them (the ordinary way you would talk to anyone) to start a rematch. It only ever starts on your own press, so a beaten trainer can never re-challenge you by itself as you walk past. Their dialogue, payout and any badge/TM reward stay exactly as they were (a reward is never paid twice), and a trainer whose talk is a hand-ported story scene -- a rival, the Rocket hideout, a gym leader's own line -- is deliberately left alone, so no story flag can be set out of order. Works on both Red/Blue/Yellow and Gold/Silver/Crystal.",
+      description = "ON: a trainer you have already beaten can be fought again. Press A on them (the ordinary way you would talk to anyone) and they will ask whether you want to battle again: YES starts a rematch, NO carries on with their usual after-battle line, exactly as if you had never asked. It only ever starts on your own press, so a beaten trainer can never re-challenge you by itself as you walk past. Their dialogue, payout and any badge/TM reward stay exactly as they were (a reward is never paid twice), and a trainer whose talk is a hand-ported story scene -- a rival, the Rocket hideout, a gym leader's own line -- is deliberately left alone, so no story flag can be set out of order. Works on both Red/Blue/Yellow and Gold/Silver/Crystal.",
     },
     {
       key = "rebattle_levels",
-      label = "+LEVEL PER REBATTLE",
+      label = "+LEVEL PER REMATCH",
       type = "choice",
       default = "off",
       choices = { { "OFF", "off" }, { "+1", "1" }, { "+2", "2" },
                   { "+4", "4" }, { "+8", "8" }, { "+16", "16" } },
-      description = "Every rematch (see REBATTLES) puts this many levels on each Pokemon in the trainer's team, cumulatively: the first fight is vanilla, the second is +this, the third +2x this, and so on. Only ever raises a level -- never a level cap or a species change of its own -- and it stacks with the DIFFICULTY team-size floor and with RAND TRAINER MONS. OFF leaves every team at its real level.",
+      description = "Every rematch (see REMATCHES) puts this many levels on each Pokemon in the trainer's team, cumulatively: the first fight is vanilla, the second is +this, the third +2x this, and so on. Only ever raises a level -- never a level cap or a species change of its own -- and it stacks with the DIFFICULTY team-size floor and with RAND TRAINER MONS. OFF leaves every team at its real level.",
     },
     {
       key = "trainer_item_drop",
       label = "TRAINER ITEM DROP",
       type = "toggle",
       default = false,
-      description = "ON: beating a trainer -- a first fight or a rematch (see REBATTLES) -- can drop one random NON-KEY item (drawn from the game's whole item list, same pool as ITEM RANDOMIZER) into your bag, shown as an ordinary \"{PLAYER} found X!\" box the moment you are back on the map. Whether a given win pays out is TRAINER ITEM CHANCE (100% by default). Key items are never dropped. If the bag pocket is full the item is quietly lost rather than shown, exactly as a real pickup would be. Works on both generations.",
+      description = "ON: beating a trainer -- a first fight or a rematch (see REMATCHES) -- can drop one random NON-KEY item (drawn from the game's whole item list, same pool as ITEM RANDOMIZER) into your bag, shown as an ordinary \"{PLAYER} found X!\" box the moment you are back on the map. Whether a given win pays out is TRAINER ITEM CHANCE (100% by default). Key items are never dropped. If the bag pocket is full the item is quietly lost rather than shown, exactly as a real pickup would be. Works on both generations.",
     },
     {
       key = "trainer_item_chance",
@@ -203,7 +215,7 @@ local function installRandomizer(mod, gen)
       default = "100",
       choices = { { "5%", "5" }, { "10%", "10" }, { "20%", "20" },
                   { "40%", "40" }, { "80%", "80" }, { "100%", "100" } },
-      description = "The chance that beating a trainer -- a first fight or a rematch (see REBATTLES) -- actually pays out the TRAINER ITEM DROP: 5%, 10%, 20%, 40%, 80% or 100% (default) of wins. Rolled once per win, so it only ever changes how often the drop happens, never which item. Only read while TRAINER ITEM DROP is on, and a key item is never dropped whatever the roll.",
+      description = "The chance that beating a trainer -- a first fight or a rematch (see REMATCHES) -- actually pays out the TRAINER ITEM DROP: 5%, 10%, 20%, 40%, 80% or 100% (default) of wins. Rolled once per win, so it only ever changes how often the drop happens, never which item. Only read while TRAINER ITEM DROP is on, and a key item is never dropped whatever the roll.",
     },
   })
 
@@ -216,6 +228,96 @@ local function installRandomizer(mod, gen)
       return value
     end
     return "normal"
+  end
+
+  -- BATTLE SCENE -- one switch for the whole custom-scene layer.  ON (the
+  -- default) keeps every wild encounter and trainer battle rendering through
+  -- g9-Battle-Scene; OFF returns to the game's own native battle screen for
+  -- both generations, so g9-Battle-Scene is never consulted (it is an
+  -- optional dependency now).  Read at battle time, so a Mod Manager change
+  -- takes effect without a reload.
+  local function battleSceneOn() return option("battle_scene") ~= false end
+
+  -- Exposed on `shared` (the table the arm chooser at the bottom hands to
+  -- installGen1/installGen2) so those separate functions -- which do not close
+  -- over this one's locals -- read the same switch.
+  shared.battleSceneOn = battleSceneOn
+
+  -- ----------------------------------------------------- reaching the scene
+  -- The scene's manifest id is `g9-Battle-Scene`, but a fork or re-release
+  -- has shipped it lower-cased (`g9-battle-scene`) -- the loader keys every mod
+  -- and its exports by `manifest.id` alone, so an id that differs only in case
+  -- would make `mod.find("g9-Battle-Scene")` return nil and turn EVERY fight
+  -- silently native.  One resolver, tried in the canonical-then-slug order,
+  -- so no other site has to know the ids.
+  local SCENE_IDS = { "g9-Battle-Scene", "g9-battle-scene", "g9-battle-scenes",
+                      "g9-Battle-Scenes" }
+  function shared.sceneHandle()
+    for _, id in ipairs(SCENE_IDS) do
+      local handle = mod.find and mod.find(id)
+      if handle and handle.exports and handle.exports.pushLayoutBattle then
+        return handle
+      end
+    end
+    return nil
+  end
+
+  -- ------------------------------------------------- silent-failure reporting
+  -- BATTLE SCENE is ON but the scene cannot be reached (not installed,
+  -- disabled, or failed to load) -- the ONE failure mode that otherwise looks
+  -- exactly like "the custom screens simply don't work", with no reason
+  -- visible on a build where the player cannot read the log.  Reported ONCE
+  -- per boot: to the log and the engine's own error list immediately, and as
+  -- a one-off in-game box the moment the overworld is next idle (the update
+  -- seams below flush it).  `gameText` is the short line the player reads;
+  -- `logDetail` is the actionable one for the mod manager / console.
+  local sceneProblemLogged, sceneProblemQueued = false, nil
+  function shared.reportSceneProblem(world, logDetail, gameText)
+    if not sceneProblemLogged then
+      sceneProblemLogged = true
+      mod.log:error("%s", logDetail)
+      local okRuntime, Runtime = pcall(require, "src.mods.Runtime")
+      if okRuntime and Runtime and type(Runtime.reportError) == "function" then
+        pcall(Runtime.reportError, mod.id or "g9-battle-sample", logDetail)
+      end
+    end
+    if gameText and not sceneProblemQueued then sceneProblemQueued = gameText end
+  end
+
+  -- Shown from whichever per-frame overworld seam the installed arm has, and
+  -- only while the world is idle, so the notice can never land on top of a
+  -- script or an open text box (and a fallback mid-battle shows after it).
+  function shared.flushSceneProblem(world)
+    if not sceneProblemQueued then return end
+    local text = sceneProblemQueued
+    sceneProblemQueued = nil
+    if world and type(world.showText) == "function" then
+      pcall(function() world:showText(text) end)
+    end
+  end
+
+  -- Run `fn` with g9-Battle-Scene's own layout-push exports hidden, then put
+  -- them back (the same swap-and-restore this file already uses for a
+  -- randomized item id).  BATTLE SCENE OFF has to beat EVERY route to the
+  -- scene -- including another mod's registered trainer: g9-battle-engine's
+  -- own registerTrainer wrap (the Gen 2 arm's captured native startBattle)
+  -- pushes a doubles/triples layout on its own whenever it finds
+  -- g9-Battle-Scene available, so hiding the scene for the length of the
+  -- native call is what makes "OFF" mean a vanilla battle for those fights too.
+  function shared.withoutScene(fn)
+    local scene = shared.sceneHandle()
+    local exports = scene and scene.exports
+    local savedPush, savedData
+    if exports then
+      savedPush, savedData = exports.pushLayoutBattle, exports.getLayoutData
+      exports.pushLayoutBattle, exports.getLayoutData = nil, nil
+    end
+    local ok, result = pcall(fn)
+    if exports then
+      exports.pushLayoutBattle, exports.getLayoutData = savedPush, savedData
+    end
+    if not ok then error(result, 0) end
+    return result
   end
 
   -- ------------------------------------------------------------- live data
@@ -236,6 +338,99 @@ local function installRandomizer(mod, gen)
   -- Built once, on first use, then cached: the roster does not change at
   -- runtime and a wild encounter should never walk ~1500 records.
   local pool, byType
+
+  -- ------------------------------------------------------------- legendaries
+  -- 2026-09-14, explicit user request: "legendaries are available for
+  -- randomization after level 45".  NO record in either generation's merged
+  -- registry carries a legendary flag (checked the engine's own species
+  -- records AND national_dex's generated tables), so the set is spelled out
+  -- here once.  A form is caught through its base: every alternate form
+  -- (MEGA, MEGA_X/Y, gigantamax/TERA-shaped, a regional variant) carries
+  -- `baseSpecies`, so `baseSpecies`-or-id membership covers all ~50 legendary
+  -- forms without listing them by hand.  The two level gates the user named
+  -- live here as named constants so the walker and the picker cannot drift.
+  local LEGENDARY_LEVEL = 45
+  local TRADE_LEVEL = 40
+  -- 2026-09-18, explicit user rule: "pokemon evolved by stones are only to
+  -- appear at minimum level of 35 in the wild".  A stone (use-item) evolution
+  -- is its own gate, and only in the wild -- a trainer's own roster keeps the
+  -- level-40 gate the rest of the non-level methods use.  See latestEvolution.
+  local STONE_LEVEL = 35
+  -- 2026-09-19, explicit user rule: "evolution by held items or happiness
+  -- condition.  IF baby pokemon (ex: happiny) allows chansey starting to appear
+  -- at lvl 25 spawn table entries.  IF non baby pokemon, evolution starts
+  -- appearing at lvl 35 spawn table entries."
+  --
+  -- So a held-item evolution (a level-up that needs the mon to HOLD a given
+  -- item -- Happiny's Oval Stone, Sneasel's Razor Claw) and a happiness
+  -- evolution (a level-up that needs friendship) are their own wild gates:
+  -- EVO_LEVEL for an ordinary pre-evolution, BABY_EVO_LEVEL when the mon
+  -- evolving is a BABY.  A trainer's own roster keeps TRADE_LEVEL, exactly as
+  -- the stone gate above does.  The BABY set is spelled out for the same
+  -- reason LEGENDARY is: no registry record carries a baby flag (checked the
+  -- engine's own records and national_dex's generated tables), and a baby is
+  -- the one thing that moves this gate.  See latestEvolution and buildEvoGates.
+  local EVO_LEVEL = 35
+  local BABY_EVO_LEVEL = 25
+  local BABY = {
+    PICHU = true, CLEFFA = true, IGGLYBUFF = true, TOGEPI = true,
+    TYROGUE = true, SMOOCHUM = true, ELEKID = true, MAGBY = true,
+    AZURILL = true, WYNAUT = true, BUDEW = true, CHINGLING = true,
+    BONSLY = true, MIME_JR = true, HAPPINY = true, MUNCHLAX = true,
+    RIOLU = true, MANTYKE = true, TOXEL = true,
+  }
+  local LEGENDARY = {
+    -- Gen 1-2
+    ARTICUNO = true, ZAPDOS = true, MOLTRES = true, MEWTWO = true, MEW = true,
+    RAIKOU = true, ENTEI = true, SUICUNE = true, LUGIA = true, HO_OH = true,
+    CELEBI = true,
+    -- Gen 3
+    REGIROCK = true, REGICE = true, REGISTEEL = true, LATIAS = true,
+    LATIOS = true, KYOGRE = true, GROUDON = true, RAYQUAZA = true,
+    JIRACHI = true, DEOXYS = true,
+    -- Gen 4
+    UXIE = true, MESPRIT = true, AZELF = true, DIALGA = true, PALKIA = true,
+    HEATRAN = true, REGIGIGAS = true, GIRATINA = true, CRESSELIA = true,
+    PHIONE = true, MANAPHY = true, DARKRAI = true, SHAYMIN = true,
+    ARCEUS = true,
+    -- Gen 5
+    VICTINI = true, COBALION = true, TERRAKION = true, VIRIZION = true,
+    TORNADUS = true, THUNDURUS = true, RESHIRAM = true, ZEKROM = true,
+    LANDORUS = true, KYUREM = true, KELDEO = true, MELOETTA = true,
+    GENESECT = true,
+    -- Gen 6
+    XERNEAS = true, YVELTAL = true, ZYGARDE = true, DIANCIE = true,
+    HOOPA = true, VOLCANION = true,
+    -- Gen 7 (the Ultra Beasts are included -- they are encounter-restricted
+    -- the same way in every game that ships them)
+    TAPU_KOKO = true, TAPU_LELE = true, TAPU_BULU = true, TAPU_FINI = true,
+    COSMOG = true, COSMOEM = true, SOLGALEO = true, LUNALA = true,
+    NIHILEGO = true, BUZZWOLE = true, PHEROMOSA = true, XURKITREE = true,
+    CELESTEELA = true, KARTANA = true, GUZZLORD = true, NECROZMA = true,
+    MAGEARNA = true, MARSHADOW = true, POIPOLE = true, NAGANADEL = true,
+    STAKATAKA = true, BLACEPHALON = true, ZERAORA = true, MELTAN = true,
+    MELMETAL = true,
+    -- Gen 8
+    ZACIAN = true, ZAMAZENTA = true, ETERNATUS = true, KUBFU = true,
+    URSHIFU = true, ZARUDE = true, REGIELEKI = true, REGIDRAGO = true,
+    GLASTRIER = true, SPECTRIER = true, CALYREX = true, ENAMORUS = true,
+    -- Gen 9
+    KORAIDON = true, MIRAIDON = true, WO_CHIEN = true, CHIEN_PAO = true,
+    TING_LU = true, CHI_YU = true, OKIDOGI = true, MUNKIDORI = true,
+    FEZANDIPITI = true, OGERPON = true, TERAPAGOS = true,
+  }
+  local function isLegendaryId(id, rec)
+    if type(id) == "string" and LEGENDARY[id] then return true end
+    local base = rec and rec.baseSpecies
+    if type(base) == "string" and LEGENDARY[base] then return true end
+    return false
+  end
+  -- A baby is a baby by its OWN id (a form's base could be one, but only the
+  -- base itself evolves out of babyhood, so this is deliberately id-only).
+  local function isBabyId(id)
+    return type(id) == "string" and BABY[id] == true
+  end
+
   local function buildPool(data)
     if pool then return true end
     data = data or liveData()
@@ -261,6 +456,10 @@ local function installRandomizer(mod, gen)
             bst = b.hp + b.attack + b.defense + b.speed + spa + spd,
             types = rec.types,
             baseStats = b,
+            -- A legendary (or a form OF one) may only ever be picked once the
+            -- encounter/party mon is LEGENDARY_LEVEL or higher -- see the
+            -- picker below.  Nothing else about the pool changes.
+            legendary = isLegendaryId(id, rec),
           }
           p[id] = entry
           for _, t in ipairs(rec.types) do
@@ -278,29 +477,616 @@ local function installRandomizer(mod, gen)
     return true
   end
 
+  -- ---------------------------------------------------------------- blacklist
+  -- 2026-09-18, explicit user request: an in-game BLACKLIST window reached from
+  -- a "BLACKLIST" row on the OPTIONS menu.  It indexes every Pokemon AND every
+  -- alternate form by name, filters by generation (START) and by starting
+  -- letter (SELECT), and lets the player delist an individual species or form,
+  -- a whole generation's roster, or a whole FORM GROUP, from randomization.
+  --
+  -- Stored as a plain array of ids on mod.save["blacklist"].  Delisting a base
+  -- species also covers its forms (delisting CHARIZARD keeps CHARIZARD_MEGA_X
+  -- out too); delisting a form covers only that form.  A whole-generation cell
+  -- simply writes every id of that generation into the same set.
+  --
+  -- 2026-09-19, explicit user request: "we will have mega forms and gigantamax
+  -- forms blacklisted by default", and the window grows a [MEGA] [GIGA] row
+  -- (the 3x3 generation grid's cells still say G1..G9) so the player can flip
+  -- either group at once.  See formGroupOf, blacklistDefaults and
+  -- shared.blacklistFormGroupToggle.
+  --
+  -- THE BLACKLIST IS A RANDOMIZER FILTER ONLY.  It is consulted exclusively by
+  -- the species picker below (pickSpecies / latestEvolution / randomizeParty)
+  -- -- never by a battle.  A battle-triggered form change (the mega evolution
+  -- a boss fight runs as the player enters the scene, the Dynamax/Gigantamax/
+  -- Terastal a battle_forms mechanic applies) is the ENGINE's, and reads none
+  -- of this: delisting every Mega and Gigantamax form by default therefore
+  -- cannot stop a boss from mega-evolving mid-fight.  Explicit user rule.
+  local BLACKLIST_KEY = "blacklist"
+
+  -- National-dex ranges -> generation.  A form is placed by its BASE species'
+  -- dex (a form record's own dex is synthetic), which is what makes the
+  -- generation filter and the 3x3 cell grid agree with the real games.
+  local GEN_RANGES = {
+    { 1, 1, 151 }, { 2, 152, 251 }, { 3, 252, 386 }, { 4, 387, 493 },
+    { 5, 494, 649 }, { 6, 650, 721 }, { 7, 722, 809 }, { 8, 810, 905 },
+    { 9, 906, 1025 },
+  }
+  local GEN_COUNT = #GEN_RANGES
+  local function generationOfDex(dex)
+    dex = tonumber(dex)
+    if not dex then return nil end
+    for _, range in ipairs(GEN_RANGES) do
+      if dex >= range[2] and dex <= range[3] then return range[1] end
+    end
+    return nil
+  end
+
+  -- Mega / Gigantamax are the two form GROUPS the window toggles at once, and
+  -- the two delisted by default.  Detected from the record's own `form` label,
+  -- which the merged registry spells "MEGA" / "MEGA_X" / "MEGA_Y" / "MEGA_Z"
+  -- (plus this project's own variants, e.g. "MALE_MEGA") and "GMAX" /
+  -- "..._GMAX"; the id suffix is the fallback for a record with no label.
+  -- Eternamax, Primal, Crowned and the regional variants are deliberately NOT
+  -- here: the request named Megas and Gigantamax only, and Eternamax in
+  -- particular is a boss form (see the RANDOMIZER-ONLY note above).
+  local function formGroupOf(id, rec)
+    local form = type(rec) == "table" and rec.form
+    if type(form) == "string" and form ~= "" then
+      local f = form:upper()
+      if f == "GMAX" or f:sub(-5) == "_GMAX" then return "gmax" end
+      if f:find("MEGA", 1, true) then return "mega" end
+    end
+    if type(id) == "string" then
+      local u = id:upper()
+      if u:sub(-5) == "_GMAX" then return "gmax" end
+      if u:sub(-5) == "_MEGA" or u:find("_MEGA_", 1, true) then return "mega" end
+    end
+    return nil
+  end
+
+  -- Every displayable species/form, built once from the merged registry.
+  -- Sorted by display name so the letter filter walks a stable A-Z order.
+  local blacklistIndex
+  local function buildBlacklistIndex(data)
+    if blacklistIndex then return blacklistIndex end
+    data = data or liveData()
+    local src = data and data.pokemon
+    if type(src) ~= "table" then return nil end
+    local function baseDex(rec)
+      if type(rec) ~= "table" then return nil end
+      if type(rec.baseDex) == "number" then return rec.baseDex end
+      local base = rec.baseSpecies
+      if type(base) == "string" then
+        local parent = src[base]
+        if type(parent) == "table" and type(parent.dex) == "number" then
+          return parent.dex
+        end
+      end
+      return rec.dex
+    end
+    local out = {}
+    for id, rec in pairs(src) do
+      if type(id) == "string" and type(rec) == "table" then
+        local name = rec.name
+        if type(name) ~= "string" or name == "" then name = id end
+        local base = type(rec.baseSpecies) == "string" and rec.baseSpecies
+          or nil
+        if base == "" then base = nil end
+        local entry = {
+          id = id, name = name, base = base,
+          form = base ~= nil, dex = baseDex(rec),
+          group = formGroupOf(id, rec),
+        }
+        entry.gen = generationOfDex(entry.dex)
+        out[#out + 1] = entry
+      end
+    end
+    if #out == 0 then return nil end
+    table.sort(out, function(a, b)
+      local an, bn = a.name:upper(), b.name:upper()
+      if an ~= bn then return an < bn end
+      return tostring(a.id) < tostring(b.id)
+    end)
+    blacklistIndex = out
+    return out
+  end
+
+  -- The shipped default: every Mega and Gigantamax form the registry carries.
+  -- Built straight from the live registry (the sorted index may not exist yet
+  -- when the randomizer asks first) and nil when the registry is not loaded
+  -- yet, so the caller can retry rather than persist an empty "default".
+  local function blacklistDefaults()
+    local data = liveData()
+    local src = data and data.pokemon
+    if type(src) ~= "table" then return nil end
+    local ids = {}
+    for id, rec in pairs(src) do
+      if type(id) == "string" and formGroupOf(id, rec) then
+        ids[#ids + 1] = id
+      end
+    end
+    return ids
+  end
+
+  -- The set is read once and then kept.  A save with NO list at all is a fresh
+  -- install, so the shipped default (every Mega + Gigantamax form) is seeded
+  -- and written; and because a later RESET ALL writes an EMPTY list rather
+  -- than a nil one, that reset is deliberate and is never re-seeded.
+  local blacklistSet
+  local blacklistResolved = false
+  local blacklist, blacklistSave
+
+  blacklist = function()
+    if blacklistResolved then return blacklistSet end
+    local stored = mod.save and mod.save:get(BLACKLIST_KEY)
+    if type(stored) == "table" then
+      blacklistSet = {}
+      for _, id in ipairs(stored) do
+        if type(id) == "string" then blacklistSet[id] = true end
+      end
+      blacklistResolved = true
+      return blacklistSet
+    end
+    local ids = blacklistDefaults()
+    if not ids then
+      -- The registry is not up yet: answer an empty set for this call and try
+      -- again next time (never persist a default we could not compute).
+      return {}
+    end
+    blacklistSet = {}
+    for _, id in ipairs(ids) do blacklistSet[id] = true end
+    blacklistResolved = true
+    blacklistSave()
+    return blacklistSet
+  end
+
+  blacklistSave = function()
+    local list = {}
+    for id in pairs(blacklist()) do list[#list + 1] = id end
+    table.sort(list)
+    if mod.save and mod.save.set then
+      pcall(mod.save.set, mod.save, BLACKLIST_KEY, list)
+    end
+  end
+
+  -- A form's own base species, cached off the live registry (the blacklist
+  -- index may not have been built when the randomizer asks first).
+  local baseOfCache = {}
+  local function baseOf(id)
+    if baseOfCache[id] ~= nil then return baseOfCache[id] or nil end
+    local data = liveData()
+    local rec = data and data.pokemon and data.pokemon[id]
+    local base = type(rec) == "table" and rec.baseSpecies
+    if type(base) ~= "string" or base == "" then base = nil end
+    baseOfCache[id] = base or false
+    return base
+  end
+
+  -- The one predicate the randomizer consults: an id is delisted when it is in
+  -- the set itself OR when its base species is (a delisted species hides its
+  -- own forms too).
+  local function isBlacklisted(id)
+    if type(id) ~= "string" then return false end
+    local set = blacklist()
+    if set[id] then return true end
+    local base = baseOf(id)
+    return base ~= nil and set[base] == true
+  end
+  shared.isBlacklisted = isBlacklisted
+  shared.buildBlacklistIndex = buildBlacklistIndex
+  shared.blacklistRaw = function(id)
+    if type(id) ~= "string" then return false end
+    return blacklist()[id] == true
+  end
+
+  -- The whole generation's roster, base species and forms alike.  A cell is
+  -- "complete" only when every indexed id of that generation is delisted (its
+  -- own id, or through a delisted base), so the drawing and the toggle agree.
+  function shared.blacklistGenComplete(gen)
+    local index = buildBlacklistIndex()
+    if not index then return false end
+    local set = blacklist()
+    local any = false
+    for _, entry in ipairs(index) do
+      if entry.gen == gen then
+        any = true
+        if not (set[entry.id] or (entry.base and set[entry.base])) then
+          return false
+        end
+      end
+    end
+    return any
+  end
+
+  -- The window's write actions.  Every one writes straight through, so the
+  -- list is kept until it is changed or reset -- there is no save step.
+  function shared.blacklistToggle(id)
+    if type(id) ~= "string" then return end
+    local set = blacklist()
+    -- A base species carries its forms along (so the window's own rows and
+    -- the randomizer agree); a form stands alone.  The flip is decided from
+    -- the id itself, once, so the whole group moves together.
+    local turnOn = not set[id]
+    set[id] = turnOn and true or nil
+    local index = buildBlacklistIndex()
+    for _, entry in ipairs(index or {}) do
+      if entry.base == id then set[entry.id] = turnOn and true or nil end
+    end
+    blacklistSave()
+  end
+
+  function shared.blacklistGenToggle(gen)
+    local index = buildBlacklistIndex()
+    if not index then return end
+    local set = blacklist()
+    local complete = shared.blacklistGenComplete(gen)
+    for _, entry in ipairs(index) do
+      if entry.gen == gen then
+        if complete then set[entry.id] = nil else set[entry.id] = true end
+      end
+    end
+    blacklistSave()
+  end
+
+  function shared.blacklistReset()
+    local set = blacklist()
+    for id in pairs(set) do set[id] = nil end
+    blacklistSave()
+  end
+
+  -- The [MEGA] / [GIGA] row's two cells.  A group is "complete" when every
+  -- indexed id of that group is delisted (its own id, or through a delisted
+  -- base), which is exactly what the cell's check mark draws; the toggle flips
+  -- the whole group at once.  `group` is formGroupOf's "mega" / "gmax".
+  function shared.blacklistFormGroupComplete(group)
+    if type(group) ~= "string" then return false end
+    local index = buildBlacklistIndex()
+    if not index then return false end
+    local set = blacklist()
+    local any = false
+    for _, entry in ipairs(index) do
+      if entry.group == group then
+        any = true
+        if not (set[entry.id] or (entry.base and set[entry.base])) then
+          return false
+        end
+      end
+    end
+    return any
+  end
+
+  function shared.blacklistFormGroupToggle(group)
+    if type(group) ~= "string" then return end
+    local index = buildBlacklistIndex()
+    if not index then return end
+    local set = blacklist()
+    local complete = shared.blacklistFormGroupComplete(group)
+    for _, entry in ipairs(index) do
+      if entry.group == group then
+        if complete then set[entry.id] = nil else set[entry.id] = true end
+      end
+    end
+    blacklistSave()
+  end
+  shared.formGroupOf = formGroupOf
+
+  -- ------------------------------------------------------------ terrain class
+  -- 2026-09-18, explicit user rule (superseding the earlier aquatic allow-list):
+  -- water areas are WATER and FLYING exclusive, a water type is banned from
+  -- every non-water area, and a flying type is allowed everywhere.  The picker
+  -- still needs to know WHICH of three kinds of ground it is standing on, so
+  -- the three spellings below converge.
+  --
+  -- Gen 1 spells a cave "indoor" (OverworldState:rollEncounter passes
+  -- "grass" / "water" / "indoor"); Gen 2 passes only "grass" / "water" and
+  -- keeps the cave/indoor case in the map header's environment
+  -- (FieldMoves.canEncounterWildMon rolls any walkable cave tile, so a cave
+  -- step is a "grass" roll with environment CAVE/DUNGEON).  Both spellings,
+  -- and the map-header fallback for a caller that passes neither, land here.
+  --   * water -- a surf/fish roll: candidates must be WATER or FLYING typed.
+  --   * cave  -- indoor/cave/dungeon/gate: land rules apply.
+  --   * land  -- grass/route: same land rules.
+  local CAVE_ENV = { CAVE = true, DUNGEON = true, INDOOR = true, GATE = true }
+  local function terrainClass(ctx)
+    if type(ctx) ~= "table" then return "land" end
+    local t = type(ctx.terrain) == "string" and ctx.terrain:lower() or nil
+    if t == "water" or t == "ocean" then return "water" end
+    if t == "indoor" or t == "cave" then return "cave" end
+    local env = ctx.environment
+    if type(env) == "string" and CAVE_ENV[env:upper()] then return "cave" end
+    return "land"
+  end
+
+  -- True when a pool entry carries the given type, in either generation's
+  -- spelling ("WATER", "WATER_TYPE", "Water").  WATER is the ban on land and
+  -- cave; WATER-or-FLYING is the allow-list on water.
+  local function hasType(entry, want)
+    local types = type(entry) == "table" and entry.types
+    if type(types) ~= "table" then return false end
+    for _, t in ipairs(types) do
+      if type(t) == "string" then
+        local u = t:upper():gsub("_TYPE$", "")
+        if u == want then return true end
+      end
+    end
+    return false
+  end
+  local function isWaterTyped(entry) return hasType(entry, "WATER") end
+  local function isFlyingTyped(entry) return hasType(entry, "FLYING") end
+
+  -- ----------------------------------------------------- evolutions by level
+  -- 2026-09-14, explicit user request: "if Level allows it, we always evolve
+  -- pokemon to latest available evolution, trade evolutions are available for
+  -- randomization after lvl 40".  So a randomised species is always pushed to
+  -- the deepest evolution its LEVEL reaches: a level method needs its own
+  -- level, every non-level method (trade, item, friendship, stat) needs
+  -- TRADE_LEVEL, and the walk stops the moment nothing is unlocked.
+  --
+  -- Two sources answer "what does this evolve into":
+  --   * the registered `evolutions` field on game.data.pokemon[id] -- the
+  --     ROM's own rows for the species that game ships (Red spells a target
+  --     `species` and a method LEVEL/ITEM/TRADE; Gold spells it `into` and
+  --     EVOLVE_LEVEL/ITEM/TRADE/HAPPINESS/STAT).
+  --   * national_dex's exported evolutionsOf(id) DISPLAY record, when that
+  --     mod is installed -- the only source of a chain for the 874+
+  --     beyond-ROM species, because every record national_dex registers ships
+  --     `evolutions = {}` on purpose (its own docs: that field is an
+  --     f.id into a fixed per-generation vocabulary and the modern
+  --     conditions have no honest id there).  Its rows are { id, methods =
+  --     { { trigger, level, ... } } }, current PokeAPI method first.
+  -- Both are normalised to { to, kind, level } so ONE walker serves them.
+  local displayEvolutions, displayResolved = nil, false
+  local function resolveDisplayEvolutions()
+    if displayResolved then return displayEvolutions end
+    displayResolved = true
+    local dex = mod.find and mod.find("national_dex")
+    local exports = dex and dex.exports
+    if exports and type(exports.evolutionsOf) == "function" then
+      displayEvolutions = exports.evolutionsOf
+    end
+    return displayEvolutions
+  end
+  local function normaliseDisplay(record)
+    local out = {}
+    local into = type(record) == "table" and record.evolvesInto
+    if type(into) ~= "table" then return out end
+    for _, target in ipairs(into) do
+      local to = type(target) == "table" and target.id
+      local methods = type(target) == "table" and target.methods
+      local method = type(methods) == "table" and methods[1] or nil
+      local trigger = method and method.trigger
+      if type(to) == "string" then
+        if trigger == "level-up" then
+          -- A level-up row carries its condition in flat fields: an outright
+          -- `level`, or a `heldItem` (hold the Oval Stone / Razor Claw and
+          -- level up) or a `minHappiness` (level up with friendship).  The
+          -- held-item and happiness shapes have NO `level`, so they must not
+          -- be read as a level-0 evolution.
+          if tonumber(method.level) then
+            out[#out + 1] = { to = to, kind = "level",
+                              level = tonumber(method.level) }
+          elseif type(method.heldItem) == "string" and method.heldItem ~= "" then
+            out[#out + 1] = { to = to, kind = "helditem" }
+          elseif tonumber(method.minHappiness) then
+            out[#out + 1] = { to = to, kind = "happiness" }
+          else
+            out[#out + 1] = { to = to, kind = "other" }
+          end
+        elseif trigger == "trade" then
+          out[#out + 1] = { to = to, kind = "trade" }
+        elseif trigger == "use-item" then
+          out[#out + 1] = { to = to, kind = "item" }
+        else
+          out[#out + 1] = { to = to, kind = "other" }
+        end
+      end
+    end
+    return out
+  end
+  local function normaliseRegistered(rows)
+    local out = {}
+    if type(rows) ~= "table" then return out end
+    for _, evo in ipairs(rows) do
+      if type(evo) == "table" then
+        local to = evo.species or evo.into
+        if type(to) == "string" then
+          local method = tostring(evo.method or ""):upper()
+          if method:find("HAPPINESS", 1, true) or method:find("FRIEND", 1, true) then
+            out[#out + 1] = { to = to, kind = "happiness" }
+          elseif method:find("TRADE", 1, true) then
+            out[#out + 1] = { to = to, kind = "trade" }
+          elseif method:find("LEVEL", 1, true) then
+            out[#out + 1] = { to = to, kind = "level",
+                              level = tonumber(evo.level) or 0 }
+          elseif method:find("ITEM", 1, true) then
+            out[#out + 1] = { to = to, kind = "item" }
+          else
+            out[#out + 1] = { to = to, kind = "other" }
+          end
+        end
+      end
+    end
+    return out
+  end
+  local evoCache = {}
+  local function evolutionRowsOf(data, id)
+    if evoCache[id] then return evoCache[id] end
+    local rows
+    local resolve = resolveDisplayEvolutions()
+    if resolve then
+      local ok, record = pcall(resolve, id)
+      if ok and type(record) == "table" then rows = normaliseDisplay(record) end
+    end
+    if not rows then
+      local rec = data and data.pokemon and data.pokemon[id]
+      rows = normaliseRegistered(rec and rec.evolutions)
+    end
+    evoCache[id] = rows
+    return rows
+  end
+  -- The wild spawn gate of every evolved species, the reverse of
+  -- evolutionRowsOf.  Built once over the whole pool: a species reached ONLY
+  -- by a stone / held-item / happiness evolution appears in the wild from its
+  -- own gate -- STONE_LEVEL for a stone, EVO_LEVEL (or BABY_EVO_LEVEL when the
+  -- pre-evolution is a baby) for a held-item or happiness one -- and never
+  -- below it (explicit user rules).  A species that is ALSO reachable by an
+  -- ordinary level-up is dropped from the table, because that path's own level
+  -- is what actually gates it.
+  local evoGates
+  local function buildEvoGates(data)
+    if evoGates then return evoGates end
+    local set, leveled = {}, {}
+    if pool then
+      for id in pairs(pool) do
+        for _, row in ipairs(evolutionRowsOf(data, id)) do
+          local to = row.to
+          if type(to) == "string" then
+            if row.kind == "level" then
+              leveled[to] = true
+            elseif row.kind == "item" or row.kind == "helditem"
+                or row.kind == "happiness" then
+              local gate
+              if row.kind == "item" then
+                gate = STONE_LEVEL
+              elseif isBabyId(id) then
+                gate = BABY_EVO_LEVEL
+              else
+                gate = EVO_LEVEL
+              end
+              local currentGate = set[to]
+              if currentGate == nil or gate < currentGate then
+                set[to] = gate
+              end
+            end
+          end
+        end
+      end
+    end
+    for to in pairs(leveled) do set[to] = nil end
+    evoGates = set
+    return set
+  end
+
+  -- Walk `id` down its chain as far as `level` unlocks, one random branch at
+  -- a time when a species has several available, and answer the final id.
+  -- `wild` selects the non-level gates: a stone needs STONE_LEVEL in the wild
+  -- and TRADE_LEVEL elsewhere, a held-item or happiness evolution needs
+  -- EVO_LEVEL (BABY_EVO_LEVEL when the mon evolving is a baby) in the wild and
+  -- TRADE_LEVEL elsewhere, and a trade keeps TRADE_LEVEL on both.  A
+  -- blacklisted target is never taken.
+  local function latestEvolution(data, id, level, wild)
+    if type(id) ~= "string" or not pool then return id end
+    level = tonumber(level) or 1
+    local visited = { [id] = true }
+    local current = id
+    for _ = 1, 20 do
+      local options = {}
+      for _, row in ipairs(evolutionRowsOf(data, current)) do
+        local target = row.to
+        local targetEntry = pool[target]
+        if targetEntry and target ~= current and not visited[target]
+            and not isBlacklisted(target) then
+          local unlocked
+          if row.kind == "level" then
+            unlocked = level >= (row.level or 0)
+          elseif row.kind == "item" then
+            unlocked = level >= (wild and STONE_LEVEL or TRADE_LEVEL)
+          elseif row.kind == "helditem" or row.kind == "happiness" then
+            local gate = wild
+              and (isBabyId(current) and BABY_EVO_LEVEL or EVO_LEVEL)
+              or TRADE_LEVEL
+            unlocked = level >= gate
+          else
+            unlocked = level >= TRADE_LEVEL
+          end
+          -- A legendary target obeys the user's level-45 gate too (the only
+          -- chains that reach one are the Cosmog line).
+          if unlocked and not (targetEntry.legendary
+              and level < LEGENDARY_LEVEL) then
+            options[#options + 1] = target
+          end
+        end
+      end
+      if #options == 0 then break end
+      local nextId = options[love.math.random(1, #options)]
+      visited[nextId] = true
+      current = nextId
+    end
+    return current
+  end
+
   -- A random species sharing at least one type with origId and whose base
   -- total lands in the user's band: 95% of the original's BST up to
   -- 100% + 5*level percentage points of it.  Returns nil (leave the mon
   -- alone) when the species is unknown or nothing qualifies -- never a
   -- forced substitute.
-  local function pickSpecies(origId, level)
+  --
+  -- `opts.terrain` is the terrain class (see terrainClass above): on "water"
+  -- a candidate must be WATER or FLYING typed; on "land"/"cave" a WATER type
+  -- is banned (a flying type is welcome anywhere).  `opts.data` lets a caller
+  -- hand the live data in rather than going through the Game facade, and
+  -- `opts.wild` marks a wild encounter so the non-level gates (stone, held
+  -- item, happiness) use their WILD levels rather than TRADE_LEVEL.  Once a
+  -- candidate is chosen it is pushed to its latest level-legal evolution.  A
+  -- legendary is never a candidate below LEGENDARY_LEVEL, and a blacklisted
+  -- species (or form) is never one at all.
+  local function pickSpecies(origId, level, opts)
     if not pool then return nil end
     local orig = pool[origId]
     if not orig then return nil end
+    local lvl = tonumber(level) or 1
+    opts = opts or {}
+    local data = opts.data or liveData()
+    local terrain = opts.terrain or (opts.aquatic and "water") or "any"
+    local wild = opts.wild == true
+    local gates = buildEvoGates(data)
     local low = orig.bst * 0.95
-    local high = orig.bst * (1 + 5 * (tonumber(level) or 1) / 100)
+    local high = orig.bst * (1 + 5 * lvl / 100)
+    local function gateOf(id) return wild and gates[id] or nil end
+    local function allowed(e)
+      if isBlacklisted(e.id) then return false end
+      -- A stone / held-item / happiness evolution only shows up in the wild
+      -- from its own gate (35, or 25 for a baby line).
+      local gate = gateOf(e.id)
+      if gate and lvl < gate then return false end
+      if terrain == "water" then
+        -- Surf/fish rule: WATER and FLYING are the only types that live here.
+        return isWaterTyped(e) or isFlyingTyped(e)
+      end
+      if terrain == "any" then return true end
+      -- Land and cave rule: never a WATER type (a flying type is fine).
+      return not isWaterTyped(e)
+    end
     local seen, candidates = {}, {}
     for _, t in ipairs(orig.types) do
       for _, e in ipairs(byType[t] or {}) do
         if not seen[e.id] and e.id ~= origId
-            and e.bst >= low and e.bst <= high then
+            and e.bst >= low and e.bst <= high
+            and (not e.legendary or lvl >= LEGENDARY_LEVEL)
+            and allowed(e) then
           seen[e.id] = true
           candidates[#candidates + 1] = e.id
         end
       end
     end
     if #candidates == 0 then return nil end
-    return candidates[love.math.random(1, #candidates)]
+    local base = candidates[love.math.random(1, #candidates)]
+    local evolved = latestEvolution(data, base, lvl, wild)
+    -- The evolution walk can land on a species the terrain (or the blacklist,
+    -- or an evolution gate) forbids; leave the original alone rather than
+    -- produce an illegal mon.
+    if isBlacklisted(evolved) then return nil end
+    local gate = gateOf(evolved)
+    if gate and lvl < gate then return nil end
+    if terrain == "water" then
+      if not (isWaterTyped(pool[evolved]) or isFlyingTyped(pool[evolved])) then
+        return nil
+      end
+    elseif terrain ~= "any" and isWaterTyped(pool[evolved]) then
+      return nil
+    end
+    return evolved
   end
 
   -- ------------------------------------------------------- difficulty specs
@@ -596,6 +1382,11 @@ local function installRandomizer(mod, gen)
   end
   shared.minTeamSize = minTeamSize
 
+  -- The wild species swap.  `terrainClass(ctx)` is the whole terrain rule on
+  -- BOTH games -- Gen 1's rollEncounter passes "grass"/"water"/"indoor", Gen 2
+  -- passes "water" for anything rolled off a water tile and keeps its caves in
+  -- the map header's `environment` -- so one call settles water vs cave vs
+  -- land here.
   mod.hooks:wrap("encounter.species", function(nextFn, enc, ctx)
     local rolled = nextFn(enc, ctx)
     if not randWildsOn() then return rolled end
@@ -604,22 +1395,44 @@ local function installRandomizer(mod, gen)
     end
     local data = (ctx and ctx.data) or liveData()
     if buildPool(data) then
-      local newId = pickSpecies(rolled.species, rolled.level)
+      local newId = pickSpecies(rolled.species, rolled.level,
+        { terrain = terrainClass(ctx), data = data, wild = true })
       if newId then rolled.species = newId end
     end
     return rolled
   end, 0)
 
+  -- Fishing rides its OWN hook, never the one above: both games roll the rod
+  -- through `encounter.fishing` and hand the result straight to the battle, so
+  -- a fished Pokemon was not being randomised at all before 0.9.1.  The
+  -- user's water rule names fished Pokemon explicitly, so the chain is wrapped
+  -- here with the same aquatic-restricted pick as a surf encounter.  The chain
+  -- returns { species, level } (or nil for "not even a nibble"), so it is
+  -- edited in place exactly like the species hook's result.
+  mod.hooks:wrap("encounter.fishing", function(nextFn, rod, mapId, candidates,
+                                                 ctx)
+    local enc = nextFn(rod, mapId, candidates, ctx)
+    if not randWildsOn() then return enc end
+    if type(enc) ~= "table" or type(enc.species) ~= "string" then return enc end
+    local data = (ctx and ctx.data) or liveData()
+    if buildPool(data) then
+      local newId = pickSpecies(enc.species, enc.level,
+        { terrain = "water", data = data, wild = true })
+      if newId then enc.species = newId end
+    end
+    return enc
+  end, 0)
+
   mod.hooks:wrap("trainer.party", function(nextFn, classId, memberId, party)
     local result = nextFn(classId, memberId, party)
-    -- Difficulty team floor first, then the cumulative rebattle levels (Gen 1
+    -- Difficulty team floor first, then the cumulative rematch levels (Gen 1
     -- only -- on Gen 2 the bonus is applied once, in the arm's own
     -- World:startBattle wrap, because this hook runs a second time inside the
     -- scene's own model build there), then the species swap (added mons are
     -- tagged, so the swap leaves them exactly as built).
     result = shared.padTrainerParty(result)
     if gameGen == 1 then
-      result = shared.scaleGen1RebattleLevels(classId, memberId, result)
+      result = shared.scaleGen1RematchLevels(classId, memberId, result)
     end
     return shared.randomizeParty(result)
   end, 0)
@@ -634,18 +1447,34 @@ local function installRandomizer(mod, gen)
   }
   local BOSS_CLASSES = { OPP_RIVAL3 = true, CHAMPION = true, RED = true }
 
+  -- Kept for a caller that knows only the class, not the team size: it is
+  -- exactly the 2+-mon answer of the real router below (bossFight for a boss
+  -- class, a doubles-or-triples roll for the Elite Four, otherwise doubles).
   function shared.layoutForClass(classId)
-    if type(classId) == "string" and BOSS_CLASSES[classId] then
-      return "bossFight"
-    end
-    if type(classId) == "string" and E4_CLASSES[classId] then
-      return (love.math.random(1, 2) == 1) and "doubles" or "triples"
-    end
-    return "doubles"
+    return shared.layoutForTrainer(classId, 2)
   end
 
   function shared.isBossClass(classId)
     return type(classId) == "string" and BOSS_CLASSES[classId] == true
+  end
+
+  -- The TRAINER layout, decided by the shape of the fight that already exists
+  -- (explicit user request, 2026-09-14: trainer battles and rematches enable
+  -- "doubles, triples and bossfight based on the already existing enemy
+  -- battle").  A boss class (Champion, Red, Gen 1's OPP_RIVAL3) always takes
+  -- "bossFight"; a team with a single Pokemon cannot fill a doubles/triples
+  -- row, so it takes the scene's own "singles" screen -- never the game's
+  -- native one; the Elite Four roll doubles-or-triples per battle; every other
+  -- 2+-mon team is a "doubles".  BOTH generation arms call this one function,
+  -- so the trainer routing can no longer drift between them.
+  function shared.layoutForTrainer(classId, partySize)
+    if shared.isBossClass(classId) then return "bossFight" end
+    local size = tonumber(partySize) or 1
+    if size < 2 then return "singles" end
+    if type(classId) == "string" and E4_CLASSES[classId] then
+      return (love.math.random(1, 2) == 1) and "doubles" or "triples"
+    end
+    return "doubles"
   end
 
   -- The wild bands, plus the 0.5% bossFight.  Its own 1-in-1000 roll first,
@@ -700,8 +1529,8 @@ local function installRandomizer(mod, gen)
   -- ======================================================================
   -- 2026-09-14, explicit user request -- five more systems, each its own
   -- option, each OFF by default so an untouched save keeps the behaviour it
-  -- had: an item randomizer, an item respawn timer, rebattles, a cumulative
-  -- +level per rebattle, and a random item drop from a beaten trainer.
+  -- had: an item randomizer, an item respawn timer, rematches, a cumulative
+  -- +level per rematch, and a random item drop from a beaten trainer.
   --
   -- Everything here is generation-agnostic -- the states and pools below are
   -- plain data -- and the two arms (installGen2 / installGen1) hang the same
@@ -714,11 +1543,11 @@ local function installRandomizer(mod, gen)
   -- arm is a nil call (exactly the crash the 0.5.0 build shipped with).
   local function itemRandomizerOn() return option("item_randomizer") == true end
   local function itemRespawnOn() return option("item_respawn") == true end
-  local function rebattlesOn() return option("rebattles") == true end
+  local function rematchesOn() return option("rebattles") == true end
   local function trainerDropOn() return option("trainer_item_drop") == true end
   shared.itemRandomizerOn = itemRandomizerOn
   shared.itemRespawnOn = itemRespawnOn
-  shared.rebattlesOn = rebattlesOn
+  shared.rematchesOn = rematchesOn
   shared.trainerDropOn = trainerDropOn
 
   -- How often a beaten trainer actually pays out the drop, as a 0..1
@@ -734,18 +1563,18 @@ local function installRandomizer(mod, gen)
   end
   shared.trainerDropChance = trainerDropChance
 
-  -- The cumulative per-rebattle level step, 0 when OFF.  Every step is read
+  -- The cumulative per-rematch level step, 0 when OFF.  Every step is read
   -- live off the Manager, so changing it takes effect on the next fight.
-  local REBATTLE_STEPS = { ["1"] = 1, ["2"] = 2, ["4"] = 4, ["8"] = 8,
+  local REMATCH_STEPS = { ["1"] = 1, ["2"] = 2, ["4"] = 4, ["8"] = 8,
                            ["16"] = 16 }
-  local function rebattleStep()
+  local function rematchStep()
     if option("rebattle_levels") == "off" then return 0 end
-    return REBATTLE_STEPS[tostring(option("rebattle_levels"))] or 0
+    return REMATCH_STEPS[tostring(option("rebattle_levels"))] or 0
   end
-  -- Wins are only tallied while at least one of the two rebattle settings
+  -- Wins are only tallied while at least one of the two rematch settings
   -- wants them, so a player who never turns this on pays nothing for it.
-  local function rebattleTracking()
-    return rebattlesOn() or rebattleStep() > 0
+  local function rematchTracking()
+    return rematchesOn() or rematchStep() > 0
   end
 
   local RESPAWN_SECONDS = { ["30s"] = 30, ["1m"] = 60, ["2m"] = 120,
@@ -753,8 +1582,8 @@ local function installRandomizer(mod, gen)
   local function respawnInterval()
     return RESPAWN_SECONDS[tostring(option("respawn_timer"))] or 60
   end
-  shared.rebattleStep = rebattleStep
-  shared.rebattleTracking = rebattleTracking
+  shared.rematchStep = rematchStep
+  shared.rematchTracking = rematchTracking
   shared.respawnInterval = respawnInterval
 
   -- The live save, through the same Gen2Compat-backed require liveData uses,
@@ -763,6 +1592,116 @@ local function installRandomizer(mod, gen)
     local ok, Game = pcall(require, "src.core.Game")
     if ok and type(Game) == "table" then return Game.save end
     return nil
+  end
+
+  -- The player roster handed to the scene: the first `count` LIVING party mons
+  -- in party order.  2026-09-12, explicit user report: a fainted mon at slot
+  -- 2/3/4 of the party was still being sent out for doubles/triples/boss
+  -- layouts, because every caller sliced party[1..count] with no HP test.  The
+  -- scene draws whatever it is handed, so a 0-HP mon landed on the field with
+  -- no switch prompt instead of the next healthy mon taking its place.  This
+  -- lives on `shared` (not per-arm) because all three Gen 2 sites -- the
+  -- doubles/triples trainer push, the fixed bossFight (Eternatus), and the
+  -- ordinary wild push -- build their rosters from the same live save, and
+  -- installGen1's own local playerRoster now delegates here too.  Walking the
+  -- whole party rather than slicing 1..count keeps the lead correct when
+  -- party[1] is the fainted one.
+  local function playerRoster(count)
+    local save = liveSave()
+    local party = save and save.party
+    local players = {}
+    for i = 1, #(party or {}) do
+      if #players >= count then break end
+      local mon = party[i]
+      if mon and (mon.hp or 0) > 0 then players[#players + 1] = mon end
+    end
+    return players
+  end
+  shared.playerRoster = playerRoster
+
+  -- --------------------------------------------------- beaten trainers
+  -- "Is this object a trainer?" and "has it already been beaten?" -- the two
+  -- questions every REMATCHES gate asks.  They live here, on `shared`, because
+  -- the two generations answer both in DIFFERENT places and a gate that only
+  -- looked at one of them is precisely how 0.9.3 shipped a REMATCHES switch
+  -- that was dead for whole classes of trainer (a Gen 2 field test that never
+  -- matched, see isTrainerNpc below).  Both are deliberately UNIONS, in the
+  -- spirit of the trainer_rematch reference's own isTrainerDefeated: one odd
+  -- defeat store must never be able to silently switch the feature off.
+  --
+  -- A trainer, by whichever field its generation fills in.  Gen 1 gives an
+  -- object `trainerClass` (+ `trainerParty`, the party index); Gen 2 gives it
+  -- the extracted `trainer` header struct (class / member / event / scriptKey).
+  --
+  -- NOTE the deliberate absence of any `scriptKey` test here.  On Gen 1 a
+  -- `scriptKey` means "this object's A press is a hand-ported story scene"
+  -- (the reason the Gen 1 gate still consults canRematch), but on Gen 2
+  -- RomExtractorGen2 sets `obj.scriptKey` from the trainer struct's own
+  -- after-battle script pointer, so it is set on essentially EVERY G/S/C
+  -- trainer.  The 0.9.3 Gen 2 gate required `not def.scriptKey`, which meant
+  -- `world:trainerBeaten(header)` was only ever reached for the handful of
+  -- trainers whose struct names no after-script -- i.e. for almost nobody.
+  function shared.isTrainerNpc(npc)
+    local d = npc and npc.def
+    if type(d) ~= "table" then return false end
+    return d.trainerClass ~= nil or d.trainerParty ~= nil
+        or type(d.trainer) == "table"
+  end
+
+  -- Already beaten, in whichever bookkeeping recorded it.
+  --
+  -- Gen 2 keeps it in the trainer struct's own EVENT_BEAT_* flag, which is
+  -- what World:trainerBeaten reads and what makes the engine's own A-press
+  -- branch skip a beaten trainer.  Both generations also expose the engine's
+  -- own `trainerDefeated` method (Gen 1 reads save.defeatedTrainers[npc.id]
+  -- and the header's event flag; Gen 2's facade backs the same name) --
+  -- that is the method the engine's built-in beaten-trainer branch uses, so
+  -- it is the one answer that is definitely right on both.  The explicit
+  -- save/flags reads underneath are the second and third look, for the same
+  -- reason the reference mod keeps them: a save that records the win in only
+  -- one of the stores still gets asked.
+  function shared.isBeatenTrainer(world, npc)
+    local d = npc and npc.def
+    if type(d) ~= "table" then return false end
+    local record = type(d.trainer) == "table" and d.trainer or nil
+
+    if record and type(world) == "table"
+        and type(world.trainerBeaten) == "function" then
+      local ok, beaten = pcall(world.trainerBeaten, world, record)
+      if ok and beaten then return true end
+    end
+
+    if type(world) == "table" and type(world.trainerDefeated) == "function" then
+      local ok, defeated = pcall(world.trainerDefeated, world, npc)
+      if ok and defeated then return true end
+    end
+
+    local save = liveSave()
+    if save and type(save.defeatedTrainers) == "table"
+        and npc.id ~= nil and save.defeatedTrainers[npc.id] then
+      return true
+    end
+
+    -- The header's event flag.  Gen 2 carries it on the struct; Gen 1's comes
+    -- off the extracted trainer header for (map label, object index).
+    local event = record and record.event or nil
+    if event == nil then
+      local data = liveData()
+      local label = world and world.map and world.map.def and world.map.def.label
+      if data and label and type(data.trainerHeader) == "function" then
+        local ok, header = pcall(data.trainerHeader, data, label, d.index)
+        event = ok and header and header.event or nil
+      end
+    end
+    if event == nil then return false end
+    if world and world.events and type(world.events.get) == "function" then
+      local ok, set = pcall(world.events.get, world.events, event)
+      if ok and set then return true end
+    end
+    if save and type(save.flags) == "table" and save.flags[event] then
+      return true
+    end
+    return false
   end
 
   -- ------------------------------------------------------------ key items
@@ -900,7 +1839,7 @@ local function installRandomizer(mod, gen)
     return origId
   end
 
-  -- ------------------------------------------------------- rebattle store
+  -- ------------------------------------------------------- rematch store
   -- How many times each trainer has been beaten, in the mod's OWN namespace --
   -- mod.save, which is save.modData[g9-battle-sample] -- because that is the
   -- save model's one rule for mod state (namespaced, never mixed into engine
@@ -910,7 +1849,7 @@ local function installRandomizer(mod, gen)
   -- on both generations (class/member for a Gen 2 map object's own header,
   -- class/party-index on Gen 1), which is what makes the +level ramp and the
   -- win tally line up whichever seam saw the fight.
-  local function rebattleStore(create)
+  local function rematchStore(create)
     local store = mod.save:get("rebattles")
     if type(store) ~= "table" then
       if not create then return nil end
@@ -920,26 +1859,26 @@ local function installRandomizer(mod, gen)
     return store
   end
 
-  function shared.rebattleCount(key)
+  function shared.rematchCount(key)
     if type(key) ~= "string" then return 0 end
-    local store = rebattleStore(false)
+    local store = rematchStore(false)
     local n = store and store[key]
     return type(n) == "number" and n or 0
   end
 
   function shared.noteTrainerWin(key)
     if type(key) ~= "string" then return end
-    local store = rebattleStore(true)
+    local store = rematchStore(true)
     if not store then return end
     store[key] = (type(store[key]) == "number" and store[key] or 0) + 1
   end
 
   -- The level bonus the UPCOMING fight against `key` should get: 0 for the
   -- first fight, one step for the second, two for the third, and so on.
-  function shared.rebattleBonus(key)
-    local step = rebattleStep()
+  function shared.rematchBonus(key)
+    local step = rematchStep()
     if step <= 0 then return 0 end
-    return step * shared.rebattleCount(key)
+    return step * shared.rematchCount(key)
   end
 
   -- One key for a trainer record, whichever shape it arrives in: a Gen 2
@@ -962,12 +1901,12 @@ local function installRandomizer(mod, gen)
   -- goes onto freshly copied rows and never onto the originals.  Returns the
   -- SAME array when there is nothing to add, so a fight with the setting off
   -- keeps exact object identity for the engine's own builder.
-  function shared.scaleGen1RebattleLevels(classId, memberId, party)
-    if type(party) ~= "table" or #party == 0 or rebattleStep() <= 0 then
+  function shared.scaleGen1RematchLevels(classId, memberId, party)
+    if type(party) ~= "table" or #party == 0 or rematchStep() <= 0 then
       return party
     end
     local key = tostring(classId) .. "/" .. tostring(memberId or 1)
-    local bonus = shared.rebattleBonus(key)
+    local bonus = shared.rematchBonus(key)
     if bonus <= 0 then return party end
     local out, changed = {}, false
     for i = 1, #party do
@@ -1137,10 +2076,18 @@ local function installGen2(mod, shared)
           opts.trainer.memberId or opts.trainer.id) then
       return false
     end
-    local exportMod = mod.find("g9-Battle-Scene")
+    local exportMod = shared.sceneHandle()
     local save = self.game and self.game.save
     if not (exportMod and exportMod.exports and exportMod.exports.pushLayoutBattle
         and save and save.party) then
+      if not exportMod then
+        shared.reportSceneProblem(self,
+          "BATTLE SCENE is ON but g9-Battle-Scene could not be reached (not "
+          .. "installed, disabled, or failed to load), so this trainer battle "
+          .. "used the native screen. Install/enable g9-Battle-Scene in the "
+          .. "Mod Manager.",
+          "BATTLE SCENE is ON but\ng9-Battle-Scene is missing.\nEnable it in the Mod Manager.")
+      end
       return false
     end
     -- Combat type, explicit user request (2026-09-12): the Elite Four roll
@@ -1157,22 +2104,25 @@ local function installGen2(mod, shared)
     opts.trainer.party = shared.randomizeParty(
       shared.padTrainerParty(opts.trainer.party))
     local classId = opts.trainer.classId or opts.trainer.class
-    local layoutName = shared.layoutForClass(classId)
-    -- A ONE-Pokemon trainer cannot fill a doubles preset -- the scene needs a
-    -- second enemy to stand in that layout's other slot -- so it is routed to
-    -- "singles" here instead of being handed to the `#enemies < 2` bail below,
-    -- which used to send the fight to the ORDINARY (vanilla) battle screen.
-    -- The first Gen 2 rival battle is the case that surfaced this: RIVAL1, the
-    -- single stolen starter, at Cherrygrove, and on EASY (vanilla team size --
-    -- no difficulty padding) it stayed one mon and fell all the way through to
-    -- native.  An intentional boss layout keeps its own preset even at one
-    -- mon, so the Champion/Red single-boss shape is untouched.
-    if #opts.trainer.party < 2 and not shared.isBossClass(classId) then
-      layoutName = "singles"
-    end
+    -- The existing enemy battle's own shape picks the preset (see
+    -- shared.layoutForTrainer's note): a boss is always "bossFight", a
+    -- one-mon team takes the scene's "singles" screen -- never the game's
+    -- native one, which is what the old `#enemies < 2` bail used to do (the
+    -- first Gen 2 rival battle, RIVAL1's single stolen starter, was the case
+    -- that surfaced it) -- an Elite Four battle rolls doubles-or-triples and
+    -- every other 2+-mon team is a "doubles".
+    local layoutName = shared.layoutForTrainer(classId, #opts.trainer.party)
     local layoutData = exportMod.exports.getLayoutData
       and exportMod.exports.getLayoutData(layoutName)
-    if not layoutData then return false end
+    if not layoutData then
+      shared.reportSceneProblem(self,
+        "BATTLE SCENE is ON and g9-Battle-Scene is loaded, but it has no '"
+        .. layoutName .. "' layout preset, so this trainer battle used the "
+        .. "native screen. Update g9-Battle-Scene.",
+        "BATTLE SCENE is ON but the\nscene has no '" .. layoutName
+        .. "' layout.\\nUpdate g9-Battle-Scene.")
+      return false
+    end
     local allyCount = math.max(1, math.min(6, layoutData.allyCount or 2))
     -- The FULL party is handed over, not a slice: the scene benches every
     -- mon past the preset's own enemyCount and sends one in as an active
@@ -1183,16 +2133,18 @@ local function installGen2(mod, shared)
       enemies[#enemies + 1] = opts.trainer.party[i]
     end
     if #enemies < 1 then return false end
-    local players = {}
-    for i = 1, allyCount do
-      if save.party[i] then players[#players + 1] = save.party[i] end
-    end
+    local players = shared.playerRoster(allyCount)
     local pushed = exportMod.exports.pushLayoutBattle(layoutName, self.game, self, {
       enemies = enemies,
       players = players,
       trainer = opts.trainer,
     })
     if not pushed then
+      shared.reportSceneProblem(self,
+        "BATTLE SCENE is ON and g9-Battle-Scene is loaded, but its '"
+        .. layoutName .. "' layout refused to push, so this trainer battle "
+        .. "used the native screen.",
+        "BATTLE SCENE is ON but the\nscene refused this layout.\nIt used the native screen.")
       mod.log:warn("g9_battle_sample: no " .. layoutName .. " preset on "
         .. "the export mod, falling back to the ordinary trainer battle")
       return false
@@ -1203,7 +2155,7 @@ local function installGen2(mod, shared)
 
   local nativeStartBattle = World.startBattle
   function World:startBattle(opts, onDone)
-    -- Cumulative +level per rebattle (see installRandomizer's own note on the
+    -- Cumulative +level per rematch (see installRandomizer's own note on the
     -- setting).  Applied HERE, once per fight: opts.trainer is already built
     -- by the caller (World:startScriptedBattle assembles it a few lines above
     -- its own call), Battle.new then builds self.enemyParty out of exactly
@@ -1213,7 +2165,7 @@ local function installGen2(mod, shared)
     -- would run twice, because this same roster also travels through the
     -- scene's own model build.
     if opts and opts.trainer and type(opts.trainer.party) == "table" then
-      local bonus = shared.rebattleBonus(shared.trainerKeyOf(opts.trainer))
+      local bonus = shared.rematchBonus(shared.trainerKeyOf(opts.trainer))
       if bonus > 0 then
         local data = self.game and self.game.data
         for _, mon in ipairs(opts.trainer.party) do
@@ -1224,20 +2176,27 @@ local function installGen2(mod, shared)
         end
       end
     end
+    -- BATTLE SCENE OFF -- every fight (wild, trainer, boss) goes to the
+    -- native screen; the scene is never consulted.  Checked AFTER the
+    -- rematch level bump above, which belongs to the REMATCHES option, not
+    -- the scene layer -- so a rematch keeps its +level even with the scene
+    -- off.  `onDone` is the plain slot World:startBattle already forwards.
+    if not shared.battleSceneOn() then
+      return shared.withoutScene(function()
+        return nativeStartBattle(self, opts, onDone)
+      end)
+    end
     if opts and opts.wild and opts.wild.species == "ETERNATUS"
         and opts.wild.level == 75
         and not opts.roaming and not opts.contest and not opts.tutorial then
-      local exportMod = mod.find("g9-Battle-Scene")
+      local exportMod = shared.sceneHandle()
       local save = self.game and self.game.save
       if exportMod and exportMod.exports and exportMod.exports.pushLayoutBattle
           and save and save.party then
         local layoutData = exportMod.exports.getLayoutData
           and exportMod.exports.getLayoutData("bossFight")
         local allyCount = math.max(1, math.min(6, (layoutData and layoutData.allyCount) or 4))
-        local players = {}
-        for i = 1, allyCount do
-          if save.party[i] then players[#players + 1] = save.party[i] end
-        end
+        local players = shared.playerRoster(allyCount)
         local pushed = exportMod.exports.pushLayoutBattle("bossFight", self.game, self, {
           enemies = { opts.wild },
           players = players,
@@ -1245,6 +2204,11 @@ local function installGen2(mod, shared)
         if pushed then return true end
         mod.log:warn("g9_battle_sample: no bossFight preset on the export "
           .. "mod, falling back to the ordinary battle screen for Eternatus")
+        shared.reportSceneProblem(self,
+          "BATTLE SCENE is ON and g9-Battle-Scene is loaded, but its "
+          .. "'bossFight' layout refused to push, so the Eternatus fight used "
+          .. "the native screen.",
+          "BATTLE SCENE is ON but the\nscene refused the bossFight\nlayout. It used native.")
       end
     elseif tryDoublesTrainer(self, opts) then
       return true
@@ -1261,6 +2225,14 @@ local function installGen2(mod, shared)
   local originalTryWildEncounter = World.tryWildEncounter
 
   function World:tryWildEncounter()
+    -- BATTLE SCENE OFF -- hand the wild roll straight to the native path.
+    -- The scoped startBattle swap below only exists to capture the roll for
+    -- the scene; with the scene off there is nothing to capture, so the
+    -- unmodified original is called directly and its own return value
+    -- (whether an encounter actually triggered) passes straight through.
+    if not shared.battleSceneOn() then
+      return originalTryWildEncounter(self)
+    end
     local save = self.game and self.game.save
     -- The old guard bailed straight to the native encounter whenever the
     -- party had fewer than 2 mons (the multi-mon layouts want a second
@@ -1293,10 +2265,16 @@ local function installGen2(mod, shared)
     -- mod.find, not a direct require -- the sanctioned way to reach
     -- another mod's own exports table (nil if that mod is absent,
     -- disabled, or hasn't run yet).
-    local exportMod = mod.find("g9-Battle-Scene")
+    local exportMod = shared.sceneHandle()
     if not (exportMod and exportMod.exports and exportMod.exports.pushLayoutBattle) then
       mod.log:warn("g9_battle_sample: g9-Battle-Scene not available, "
         .. "falling back to a single wild battle")
+      shared.reportSceneProblem(self,
+        "BATTLE SCENE is ON but g9-Battle-Scene could not be reached (not "
+        .. "installed, disabled, or failed to load), so this wild encounter "
+        .. "used the native screen. Install/enable g9-Battle-Scene in the "
+        .. "Mod Manager.",
+        "BATTLE SCENE is ON but\ng9-Battle-Scene is missing.\nEnable it in the Mod Manager.")
       realStartBattle(self, capturedOpts)
       return true
     end
@@ -1342,10 +2320,7 @@ local function installGen2(mod, shared)
     -- x1..x5 max HP for the 0.5% boss wild, before the scene reads it.
     if isBossWild then shared.scaleWildHp(capturedOpts.wild) end
 
-    local players = {}
-    for i = 1, allyCount do
-      if save.party[i] then players[#players + 1] = save.party[i] end
-    end
+    local players = shared.playerRoster(allyCount)
 
     local pushed = exportMod.exports.pushLayoutBattle(layoutName, self.game, self, {
       enemies = enemies,
@@ -1354,6 +2329,11 @@ local function installGen2(mod, shared)
     if not pushed then
       mod.log:warn("g9_battle_sample: no " .. layoutName .. " preset on the export mod, "
         .. "falling back to a single wild battle")
+      shared.reportSceneProblem(self,
+        "BATTLE SCENE is ON and g9-Battle-Scene is loaded, but its '"
+        .. layoutName .. "' layout refused to push, so this wild encounter "
+        .. "used the native screen.",
+        "BATTLE SCENE is ON but the\nscene refused this layout.\nIt used the native screen.")
       realStartBattle(self, capturedOpts)
     elseif isBossWild then
       shared.applyBossFlags(pushed)
@@ -1415,13 +2395,13 @@ local function installGen2(mod, shared)
     return true
   end
 
-  -------------------------------------------------------------- rebattles
+  -------------------------------------------------------------- rematches
   -- TalkToTrainerScript with its two beaten-check rows (the `trainerflagaction
   -- CHECK_FLAG` and the `iftrue` that jumps to scripttalkafter) taken out and
   -- nothing else touched.  Its tail is kept because both of those rows are
   -- idempotent: SET_FLAG on an already-set flag is a silent no-op, and
   -- scripttalkafter is what a first-time fight shows too.
-  local REBATTLE_TALK_SCRIPT = {
+  local REMATCH_TALK_SCRIPT = {
     { op = "faceplayer" },
     { op = "loadtemptrainer" },
     { op = "encountermusic" },
@@ -1436,21 +2416,69 @@ local function installGen2(mod, shared)
     { op = "scripttalkafter" },
   }
 
-  -- A press on a beaten trainer starts a rematch.  interactBody seams the
-  -- Gen 1 talkTo dispatch in through Gen1Facade.talkToWrapper once the object
-  -- is resolved, and a `true` return suppresses the built-in path -- which for
-  -- a beaten trainer is TALK_TO_TRAINER_SCRIPT, i.e. only its after-battle
-  -- line.  An object whose A press is a hand-ported script (def.scriptKey) is
-  -- left alone, and anything this wrap does not claim falls through to
-  -- whatever held the seam before it (the facade's own default is a bare
-  -- `return false`, so a mod-free press behaves exactly as it did).
+  -- The native TalkToTrainerScript verbatim -- the script a plain A press
+  -- runs.  Used as the answer to NO, so declining a rematch is
+  -- indistinguishable from never having been asked: its CHECK_FLAG sees the
+  -- beaten flag and jumps straight to scripttalkafter (the trainer's own
+  -- after-battle line or script).  Copied rather than called because World's
+  -- own local is not reachable from a mod.
+  local TALK_TO_TRAINER_SCRIPT_COPY = {
+    { op = "faceplayer" },
+    { op = "trainerflagaction", action = 2 }, -- CHECK_FLAG
+    { op = "iftrue", script = { { op = "scripttalkafter" } } },
+    { op = "loadtemptrainer" },
+    { op = "encountermusic" },
+    { op = "opentext" },
+    { op = "trainertext", index = 0 },
+    { op = "waitbutton" },
+    { op = "closetext" },
+    { op = "loadtemptrainer" },
+    { op = "startbattle" },
+    { op = "reloadmapafterbattle" },
+    { op = "trainerflagaction", action = 1 },
+    { op = "scripttalkafter" },
+  }
+
+  -- A press on a beaten trainer ASKS before rematching (explicit user request,
+  -- 2026-09-14): beating someone no longer means every later A press silently
+  -- starts another fight.  interactBody seams the Gen 1 talkTo dispatch in
+  -- through Gen1Facade.talkToWrapper once the object is resolved, and a `true`
+  -- return suppresses the built-in path -- which for a beaten trainer is
+  -- TALK_TO_TRAINER_SCRIPT, i.e. only its after-battle line.  Anything this
+  -- wrap does not claim falls through to whatever held the seam before it (the
+  -- facade's own default is a bare `return false`, so a mod-free press behaves
+  -- exactly as it did).
+  --
+  -- The gate is shared.isTrainerNpc + shared.isBeatenTrainer -- NOT a
+  -- `def.scriptKey` screening.  0.9.3 asked for `not def.scriptKey` here, in
+  -- the belief that a scriptKey marks a story scene to leave alone (true on
+  -- Gen 1).  On Gen 2 the extractor sets `def.scriptKey` from the trainer
+  -- struct's own after-battle script pointer (RomExtractorGen2's
+  -- readTrainerHeader -> "dw after-script"), so it is set on essentially every
+  -- G/S/C trainer and the beaten test was never reached: REMATCHES was simply
+  -- dead in Gold/Silver/Crystal.  Nothing is lost by asking -- both answers
+  -- end in `scripttalkafter`, which tail-calls that same after-script, so a
+  -- leader's badge or TM hand-over still runs either way.
+  --
+  -- The question goes up exactly the way the engine's own `yesorno` does:
+  -- World:showText with `stay` leaves the box standing once it has typed, and
+  -- World:askYesNo stacks the YES/NO prompt on THAT box (so the question is
+  -- never re-printed under the prompt).  The NPC is frozen up front so a
+  -- wanderer cannot roll a new facing under the prompt.
   local nativeTalkTo = ow.talkTo
   ow.talkTo = function(world, npc)
-    local def = npc and npc.def
-    local header = def and def.trainer
-    if shared.rebattlesOn() and type(header) == "table" and not def.scriptKey
-        and world:trainerBeaten(header) then
-      world:startTrainerScript(npc, REBATTLE_TALK_SCRIPT, nil)
+    if shared.rematchesOn() and shared.isTrainerNpc(npc)
+        and shared.isBeatenTrainer(world, npc) then
+      world:freezeNpc(npc)
+      world:showText("Do you want to battle again?", function()
+        world:askYesNo(function(yes)
+          if yes then
+            world:startTrainerScript(npc, REMATCH_TALK_SCRIPT, nil)
+          else
+            world:startTrainerScript(npc, TALK_TO_TRAINER_SCRIPT_COPY, nil)
+          end
+        end)
+      end, true)
       return true
     end
     if type(nativeTalkTo) == "function" then
@@ -1486,7 +2514,7 @@ local function installGen2(mod, shared)
     end
     lastEndedBattle = payload
     local key = shared.trainerKeyOf(trainer)
-    if key and shared.rebattleTracking() then shared.noteTrainerWin(key) end
+    if key and shared.rematchTracking() then shared.noteTrainerWin(key) end
     shared.queueTrainerDrop()
   end)
 
@@ -1501,6 +2529,10 @@ local function installGen2(mod, shared)
     if type(nativeOwUpdate) == "function" then nativeOwUpdate(world, dt) end
     if not (world.player and world.map) then return end
     if world:busy() then return end
+    -- BATTLE SCENE ON with no reachable scene: the one-off notice queued at
+    -- the fallback shows here, on the first idle frame after it (see
+    -- shared.reportSceneProblem).
+    shared.flushSceneProblem(world)
     if shared.tickRespawn(dt) then
       local ok, err = pcall(respawnOneItemGen2, world)
       if not ok then
@@ -1515,13 +2547,15 @@ local function installGen2(mod, shared)
     end)
   end
 
-  mod.log:info("g9_battle_sample: every wild encounter routes to "
+  mod.log:info("g9_battle_sample: with BATTLE SCENE on (the default), every "
+    .. "wild encounter routes to "
     .. "g9-Battle-Scene -- 0.5%% \"bossFight\" (x1..x5 HP + random flags), then "
     .. "1%% \"hordes\", 2%% \"triples\", 10%% \"doubles\", ~86%% \"singles\" (the "
     .. "native scene is never called); every 2+-mon trainer battle routes to "
     .. "\"doubles\", the Elite Four rolls doubles/triples, and the Champion and "
     .. "Red route to \"bossFight\"; wild_forms's Eternatus-as-Eternamax static "
-    .. "routes to \"bossFight\"")
+    .. "routes to \"bossFight\" (with BATTLE SCENE off every fight uses the "
+    .. "native screen instead)")
 end
 
 
@@ -1618,14 +2652,10 @@ local function installGen1(mod, shared)
   -- The scene draws whatever it is handed, so forwarding a fainted lead would
   -- put a 0-HP mon on the field with no switch prompt -- walking the whole
   -- party (rather than slicing 1..count) keeps the lead correct when
-  -- party[1] is fainted.
+  -- party[1] is fainted.  Delegates to shared.playerRoster (2026-09-12) so
+  -- both arms share one implementation of this rule.
   local function playerRoster(count)
-    local players = {}
-    for _, mon in ipairs((Game.save and Game.save.party) or {}) do
-      if #players >= count then break end
-      if mon and (mon.hp or 0) > 0 then players[#players + 1] = mon end
-    end
-    return players
+    return shared.playerRoster(count)
   end
 
   local function layoutDataFor(exportMod, name)
@@ -1709,11 +2739,21 @@ local function installGen1(mod, shared)
   -- call the native pushBattle), false to let native handle it.
   local function tryDivert(self, battle, trainerNpc)
     pendingTransition = nil
-    local exportMod = mod.find("g9-Battle-Scene")
+    -- BATTLE SCENE OFF -- let the native pushBattle run for every battle
+    -- (returning false is exactly the "let native handle it" contract this
+    -- seam documents).  The native scene is generation-correct by itself:
+    -- Gen 1's own OverworldState:pushBattle on Red/Blue/Yellow.
+    if not shared.battleSceneOn() then return false end
+    local exportMod = shared.sceneHandle()
     if not (exportMod and exportMod.exports
         and exportMod.exports.pushLayoutBattle) then
       mod.log:warn("g9_battle_sample: g9-Battle-Scene not available, "
         .. "falling back to the ordinary Gen 1 battle screen")
+      shared.reportSceneProblem(self,
+        "BATTLE SCENE is ON but g9-Battle-Scene could not be reached (not "
+        .. "installed, disabled, or failed to load), so this battle used the "
+        .. "native screen. Install/enable g9-Battle-Scene in the Mod Manager.",
+        "BATTLE SCENE is ON but\ng9-Battle-Scene is missing.\nEnable it in the Mod Manager.")
       return false
     end
     local save = Game.save
@@ -1745,7 +2785,6 @@ local function installGen1(mod, shared)
         battle.enemyParty = padded
         team = padded
       end
-      if #team < 2 then return false end
       -- Defer entirely to a trainer explicitly registered through
       -- g9-battle-engine's own mod.exports.registerTrainer -- that
       -- registration's own combatType is the one real authority for what it
@@ -1757,10 +2796,14 @@ local function installGen1(mod, shared)
             battle.partyIndex) then
         return false
       end
-      -- Combat type, matching the Gen 2 arm's 2026-09-12 rule: the Elite
-      -- Four roll doubles-or-triples per battle, the Champion (OPP_RIVAL3
-      -- on Gen 1) gets the bossFight layout, everyone else is a doubles.
-      layoutName = shared.layoutForClass(battle.oppClass)
+      -- Combat type, matching the Gen 2 arm exactly (shared.layoutForTrainer
+      -- is the one implementation): the Elite Four roll doubles-or-triples,
+      -- the Champion (OPP_RIVAL3 on Gen 1) takes the bossFight layout, every
+      -- other 2+-mon team is a doubles and a ONE-mon team takes the scene's
+      -- own "singles" screen -- never the game's native one.  (The old
+      -- `#team < 2` bail that sent a single-mon trainer fight to native is
+      -- gone, so Gen 1 now matches Gen 2's RIVAL1 handling.)
+      layoutName = shared.layoutForTrainer(battle.oppClass, #team)
       -- The FULL team, not a slice -- the scene benches the extra mons for
       -- a trainer battle and sends them in as actives faint (see the Gen 2
       -- arm's own note).
@@ -1768,7 +2811,7 @@ local function installGen1(mod, shared)
       for i = 1, #team do
         enemies[#enemies + 1] = team[i]
       end
-      if #enemies < 2 then return false end
+      if #enemies < 1 then return false end
       -- The real trainer table (name/class/baseMoney/party), forwarded so the
       -- narration and the client's own trainer-battle flag stay correct on
       -- Gen 1 exactly as they do on Gen 2.
@@ -1814,6 +2857,12 @@ local function installGen1(mod, shared)
     if not layoutDataFor(exportMod, layoutName) then
       mod.log:warn("g9_battle_sample: no " .. layoutName .. " preset on "
         .. "the export mod, falling back to the ordinary Gen 1 battle screen")
+      shared.reportSceneProblem(self,
+        "BATTLE SCENE is ON and g9-Battle-Scene is loaded, but it has no '"
+        .. layoutName .. "' layout preset, so this Gen 1 battle used the "
+        .. "native screen. Update g9-Battle-Scene.",
+        "BATTLE SCENE is ON but the\nscene has no '" .. layoutName
+        .. "' layout.\nUpdate g9-Battle-Scene.")
       return false
     end
     local players = playerRoster(rosterSize(exportMod, layoutName,
@@ -1843,6 +2892,11 @@ local function installGen1(mod, shared)
       pendingTransition = nil
       mod.log:warn("g9_battle_sample: " .. layoutName .. " refused to "
         .. "push, falling back to the ordinary Gen 1 battle screen")
+      shared.reportSceneProblem(self,
+        "BATTLE SCENE is ON and g9-Battle-Scene is loaded, but its '"
+        .. layoutName .. "' layout refused to push, so this Gen 1 battle used "
+        .. "the native screen.",
+        "BATTLE SCENE is ON but the\nscene refused this layout.\nIt used the native screen.")
       return false
     end
     -- Random boss protections: the 0.5% wild bossFight, and a Champion/Red
@@ -1949,7 +3003,7 @@ local function installGen1(mod, shared)
   end
 
   -- =====================================================================
-  -- ITEM RANDOMIZER / ITEM RESPAWN / REBATTLES / TRAINER DROPS -- Gen 1.
+  -- ITEM RANDOMIZER / ITEM RESPAWN / REMATCHES / TRAINER DROPS -- Gen 1.
   --
   -- The same four systems the Gen 2 arm installs, hung on Gen 1's own seams:
   -- the item id is swapped around the native pickup calls (so nothing at all
@@ -1968,7 +3022,7 @@ local function installGen1(mod, shared)
   -- when mapScripts owns this NPC's talk: talkTo's own first branch hands the
   -- press to that hand-ported script, and a rematch must never take a story
   -- scene away from it (rivals, Silph, the gym leaders' TM retry, ...).
-  local function canRebattle(self, d)
+  local function canRematch(self, d)
     local ok, mapScripts = pcall(require, "data.scripts.init")
     if not (ok and type(mapScripts) == "table" and mapScripts.talkScript) then
       return true
@@ -2082,16 +3136,38 @@ local function installGen1(mod, shared)
       end
       return nativeTalkTo(self, npc)
     end
-    -- A press on a beaten trainer, when REBATTLES is on, is a rematch: the
-    -- same two calls talkTo itself makes for a living trainer (native sets
-    -- npc.frozen at its top, hence the matching unfreeze).  checkVictoryRewards
-    -- runs inside engageTrainer and early-returns on an already-claimed
-    -- reward, so a badge or TM is never handed out a second time.
-    if shared.rebattlesOn() and d.trainerClass and self:trainerDefeated(npc)
-        and canRebattle(self, d) then
+    -- A press on a beaten trainer, when REMATCHES is on, ASKS first (explicit
+    -- user request, 2026-09-14): beating someone no longer means every later A
+    -- press silently starts another fight.  YES runs the ordinary
+    -- engageTrainer flow -- the same two calls talkTo makes for a living
+    -- trainer (native sets npc.frozen at its top, hence the matching
+    -- unfreeze); checkVictoryRewards runs inside it and early-returns on an
+    -- already-claimed reward, so a badge or TM is never handed out twice.  NO
+    -- hands the press straight to the native beaten-trainer path, which shows
+    -- the trainer's own after-battle line.
+    --
+    -- `isTrainerNpc` / `isBeatenTrainer` are the shared unions (see their own
+    -- notes above): 0.9.3 tested `d.trainerClass` and `self:trainerDefeated`
+    -- one at a time, so a save that recorded the win in only one of the
+    -- engine's stores -- the defeatedTrainers set, the header event flag, the
+    -- badge -- could leave a beaten trainer with no way to be re-fought.
+    -- canRematch still stands in for the engine's own first branch: a press
+    -- mapScripts already owns (a rival, the Rocket hideout, a gym leader's own
+    -- retry line) keeps its script, exactly as if REMATCHES were off.
+    if shared.rematchesOn() and shared.isTrainerNpc(npc)
+        and shared.isBeatenTrainer(self, npc) and canRematch(self, d) then
       npc.frozen = true
       self:makeNpcFacePlayer(npc)
-      self:engageTrainer(npc, function() npc.frozen = false end)
+      local function finish() npc.frozen = false end
+      Game.stack:push(TextBox.new(Game, "Do you want to battle again?", nil, {
+        choice = function(yes)
+          if yes then
+            self:engageTrainer(npc, finish)
+          else
+            nativeTalkTo(self, npc)
+          end
+        end,
+      }))
       return
     end
     return nativeTalkTo(self, npc)
@@ -2135,7 +3211,7 @@ local function installGen1(mod, shared)
     if result == "win" and battle and battle.kind == "trainer" then
       local key = tostring(battle.oppClass or "?") .. "/"
         .. tostring(battle.partyIndex or 1)
-      if shared.rebattleTracking() then shared.noteTrainerWin(key) end
+      if shared.rematchTracking() then shared.noteTrainerWin(key) end
       shared.queueTrainerDrop()
     end
     return nativeAfterBattle(self, result, battle)
@@ -2148,6 +3224,10 @@ local function installGen1(mod, shared)
   function OverworldState:update(dt)
     nativeUpdate(self, dt)
     if not (self.player and self.map and overworldIdle(self)) then return end
+    -- BATTLE SCENE ON with no reachable scene: the one-off notice queued at
+    -- the fallback shows here, on the first idle frame after it (see
+    -- shared.reportSceneProblem).
+    shared.flushSceneProblem(self)
     if shared.tickRespawn(dt) then
       local ok, err = pcall(respawnOneItemGen1, self)
       if not ok then
@@ -2163,794 +3243,358 @@ local function installGen1(mod, shared)
     end)
   end
 
-  mod.log:info("g9_battle_sample: Gen 1 wild encounters route to "
+  mod.log:info("g9_battle_sample: with BATTLE SCENE on (the default), Gen 1 "
+    .. "wild encounters route to "
     .. "g9-Battle-Scene (0.5%% \"bossFight\" with x1..x5 HP + random flags, "
     .. "1%% \"hordes\", 2%% \"triples\", 10%% \"doubles\", ~86%% \"singles\"); "
     .. "every 2+-mon trainer battle routes to \"doubles\", the Elite Four "
     .. "rolls doubles/triples, and the Champion (OPP_RIVAL3) routes to "
     .. "\"bossFight\"; wild_forms's Eternatus-as-Eternamax static routes to "
-    .. "\"bossFight\"")
+    .. "\"bossFight\" (with BATTLE SCENE off the native Gen 1 screen runs "
+    .. "instead)")
 end
 
--- ============================================================= TRAIN screen
---
--- 2026-09-14, explicit user request: a "TRAIN" row in the party submenu, on
--- BOTH generations, that opens a two-screen editor for the selected Pokemon.
--- Modeled on the engine's own Adv.Stats party screen (stats/dev_stats_screen
--- .lua) -- the confirmed-working pattern on both generations: a plain window
--- (Gen 1 192x173, Gen 2 160x144) that never touches Renderer:setUISize, the
--- same ui.party.submenu hook, {id=,label=,onSelect=} rows, and a pcall-guarded
--- update/draw pair that pops the screen instead of raising.
---
---   Screen one -- STATS: IV / EV / Nature / gender.
---     A framed tab strip across the top -- IV, EV, NAT, the <male>/<female>
---     symbols and MOVES -- walked with LEFT/RIGHT; the gender tab prints BOTH
---     symbols as its label with a rule under the one currently set, and the
---     footer's gender box prints that one symbol on its own, so the tab is the
---     menu and the footer is the value; UP/DOWN from it drops to
---     the APPLY button under the table.  Every option on the screen is drawn
---     inside a rectangle rather than as bracketed text, and the option the
---     cursor is on is framed twice (explicit user spec).  The six stats
---     (ModernStats.ORDER) are always listed with their IV, EV and resulting
---     stat in framed rows.  On IV/EV, A enters the rows, LEFT/RIGHT cycles the
---     + / - / 0 / 31 buttons, UP/DOWN walks the six stats and A applies the
---     chosen button; on NAT and the gender tab, LEFT/RIGHT (or A) changes that
---     value directly.  A on MOVES opens screen two.  Every change is committed
---     through the battle engine's
---     OWN ModernStats.recalcAll -- the same function stats/ev_yield_on_faint
---     .lua uses -- with the current damage carried across, so the edited
---     numbers are what g9-battle-engine's combat reads.  A committed mon is
---     flagged (mon.g9TrainEdited) so the NATIVE recomputes re-apply the edit
---     instead of silently undoing it:
---       * Gen 2: src/ui/gen2/PartyMenu.lua calls Mon.refreshStats on EVERY
---         party-menu open and Battle.new does on every battle start, both
---         rebuilding mon.stats from dvs/statExp -- Mon.refreshStats is wrapped
---         so an edited mon's modern stats are re-applied right after.
---       * pokemon.level_up (raised by both generations' own experience code
---         after the level change) re-applies at the new level.
---       * battle.started re-applies for the whole party (Gen 2's Battle.new
---         runs its refresh BEFORE it raises that event).
---     Gen 1 also keeps mon.stats.special complete, mirrored from Spa: the
---     native Stats.ensure rebuilds a stat block from DVs when any of its five
---     Gen 1 keys is missing, which would otherwise quietly undo the edit.
---     All edits live on the mon itself (ivs/evs/nature/gender), so they ride
---     the save like any other field.
---
---   Screen two -- MOVES: Egg, Relearn (level-up) and Tutor moves the species
---     can learn, straight from national_dex's UNFILTERED movepool
---     (statsBySpecies(id).movesFull / .movesByMethod), each costing 5000.
---     Machines are deliberately NOT offered -- neither TMs nor TRs, explicit
---     user spec, so movesByMethod.machine is never read -- and a move the mon
---     already knows is never listed.  A move g9-battle-engine cannot actually
---     run yet (its own isMoveUsable) is filtered out too.  A full moveset asks
---     which slot to forget; an HM slot is refused, exactly like the native
---     move deleter.  Money is read/written through the same Gen2Compat-backed
---     save the rest of this mod uses (save.money on Gen 1, save.player.money
---     on Gold).
-local function installTrainScreen(mod, gen, shared)
-  local engine = mod.find and mod.find("g9-battle-engine")
-  local engineExports = engine and engine.exports
-  local ModernStats = engineExports and engineExports.ModernStats
-  if type(ModernStats) ~= "table" then
-    -- The engine is a declared dependency, but stay quiet-safe if it is not
-    -- there: the row simply never appears rather than erroring every menu.
-    mod.log:warn("g9_battle_sample: TRAIN screen not installed -- "
-      .. "g9-battle-engine ModernStats unavailable")
+-- The BLACKLIST window added 2026-09-18 (explicit user request): a custom
+-- screen reached from the "BLACKLIST" row this installs on the OPTIONS menu.
+-- It indexes every species AND alternate form by name, filters by generation
+-- (START) and by starting letter (SELECT), and delists the hovered Pokemon (A),
+-- a whole generation's roster (A on a grid cell), or a whole form group -- the
+-- [MEGA] / [GIGA] row under the grid (explicit user request, 2026-09-19).  The
+-- actual list (and its persistence) lives in installRandomizer's blacklist
+-- system -- this screen is only its face.
+local function installBlacklist(mod, gen, shared)
+  if type(shared) ~= "table"
+      or type(shared.buildBlacklistIndex) ~= "function"
+      or type(shared.blacklistToggle) ~= "function" then
+    mod.log:warn("g9_battle_sample: BLACKLIST screen not installed -- "
+      .. "blacklist system unavailable")
     return
   end
 
   local Font = require("src.render.Font")
 
-  local STAT_ORDER = ModernStats.ORDER
-  local STAT_LABEL = { hp = "HP", atk = "ATK", def = "DEF",
-    spa = "SPA", spd = "SPD", spe = "SPE" }
-  local NATURES = ModernStats.NATURES or {}
-  local MOVE_COST = 5000
-  local MOVE_FIELD_LABELS = { "EGG", "RELEARN", "TUTOR" }
-  -- Moves the native move deleter refuses to forget (engine/pokemon/learn.asm
-  -- HM_MOVES); a paid slot replacement is held to the same rule.
-  local HM_MOVES = {
-    CUT = true, FLY = true, SURF = true, STRENGTH = true, FLASH = true,
-    WHIRLPOOL = true, WATERFALL = true, DIVE = true,
-  }
-  -- The Gen 2 party submenu box holds NumMonMenuItems (8) rows; Gen 1's grows
-  -- upward with no ceiling.  Same guard the engine's own adv.stats screen uses.
-  local NUM_MONMENU_ITEMS = 8
+  -- The request fixes the grid at three generations per row, nine cells.
+  local GEN_COUNT = 9
+  local LETTER_COUNT = 26
+  local VISIBLE_NAMES = 9
 
-  -- --------------------------------------------------------------- plumbing
-  -- national_dex is optional; every lookup below degrades to "no data" rather
-  -- than erroring when it is absent, the same contract ModernStats itself uses.
-  local function ndExports()
-    local nd = mod.find and mod.find("national_dex")
-    return nd and nd.exports
-  end
+  -- A 16:9 surface that IS the whole playfield at the game's native 960x540
+  -- window: 960/320 = 3 and 540/180 = 3, so the renderer's integer fit scale
+  -- lands on a clean 3x with NO letterbox and every 8px frame and glyph stays
+  -- on the grid.  The classic 160x144 window is 20x18 tiles; this is 40x22.5.
+  -- The old 240x216 was 10:9 -- nearer square than the screen -- so on a 16:9
+  -- window it letterboxed, and on Gold it was silently clipped to the classic
+  -- 160x144 because Gen 2 never reads a state's uiSize() (see the two seams
+  -- below).
+  local UI_W, UI_H = 320, 180
 
-  local function defFromData(data, mon)
-    local fallback = data and data.pokemon and data.pokemon[mon.species]
-    return ModernStats.resolveBase(mon.species, fallback, ndExports())
-  end
-  local function defFor(game, mon)
-    return defFromData(game and game.data, mon)
-  end
-
-  local function liveSave()
-    local ok, Game = pcall(require, "src.core.Game")
-    if ok and type(Game) == "table" then return Game.save end
-    return nil
-  end
-  local function liveData()
-    local ok, Game = pcall(require, "src.core.Game")
-    if ok and type(Game) == "table" then return Game.data end
-    return nil
-  end
-
-  -- Gen 2 keeps the wallet on save.player.money; Gen 1 on save.money.  Read the
-  -- Gen 2 field FIRST so the Gen 2Compat facade's `save.money` (documented as
-  -- absent on Gold) is never touched there.
-  local function moneyOf(save)
-    if type(save) ~= "table" then return 0 end
-    local player = save.player
-    if type(player) == "table" and type(player.money) == "number" then
-      return player.money
-    end
-    return tonumber(save.money) or 0
-  end
-  local function setMoney(save, value)
-    if type(save) ~= "table" then return end
-    value = math.max(0, math.floor(value or 0))
-    local player = save.player
-    if type(player) == "table" and player.money ~= nil then
-      player.money = value
-    else
-      save.money = value
-    end
-  end
-
-  -- Commit an edited mon's modern fields to mon.stats.  Same body as the
-  -- engine's own ev_yield_on_faint recompute: carry the missing HP across
-  -- rather than healing to full, mirror the split specials into whichever key
-  -- names this generation's native code reads, and keep maxHp in step on Gen 2.
-  local function applyModern(def, mon)
-    if type(mon) ~= "table" then return end
-    if type(def) ~= "table" or type(def.baseStats) ~= "table" then return end
-    mon.stats = mon.stats or {}
-    local oldMax = mon.stats.hp or 1
-    local oldHp = math.max(0, math.min(mon.hp or 0, oldMax))
-    local missing = math.max(0, oldMax - oldHp)
-    ModernStats.recalcAll(def, mon)
-    if gen == 2 then
-      mon.stats.specialAttack = mon.stats.spa
-      mon.stats.specialDefense = mon.stats.spd
-      mon.maxHp = mon.stats.hp
-    else
-      -- Keep Gen 1's five-key stat block complete (and current) so the native
-      -- Stats.ensure never treats it as unfinished and rebuilds it from DVs.
-      mon.stats.special = mon.stats.spa
-    end
-    if oldHp <= 0 then
-      mon.hp = 0
-    else
-      mon.hp = math.max(1, mon.stats.hp - missing)
-    end
-    mon.modernStatsInitialized = true
-    mon.g9TrainEdited = true
-  end
-
-  -- ---------------------------------------------------- change preservation
-  -- (1) Gen 2: re-apply after every native refreshStats.
-  if gen == 2 then
-    local okMon, Mon = pcall(require, "src.battle.gen2.Mon")
-    if okMon and type(Mon) == "table"
-        and type(Mon.refreshStats) == "function"
-        and not Mon.__g9TrainRefreshWrapped then
-      Mon.__g9TrainRefreshWrapped = true
-      local nativeRefresh = Mon.refreshStats
-      Mon.refreshStats = function(mon, data)
-        local result = nativeRefresh(mon, data)
-        if type(mon) == "table" and mon.g9TrainEdited then
-          pcall(applyModern, defFromData(data, mon), mon)
-        end
-        return result
-      end
-    end
-  end
-
-  -- (2) Either generation: re-apply after a level change (both Experience.lua
-  -- and gen2/Mon.lua raise this AFTER writing the new level's stats).
-  mod.events:on("pokemon.level_up", function(ev)
-    local mon = ev and ev.mon
-    if type(mon) ~= "table" or not mon.g9TrainEdited then return end
-    local ok, err = pcall(function()
-      applyModern(defFromData(liveData(), mon), mon)
-    end)
-    if not ok then
-      mod.log:warn("g9_battle_sample: TRAIN level-up reapply failed: %s",
-        tostring(err))
-    end
-  end)
-
-  -- (3) Either generation: re-apply the whole party at battle start.  Gen 2's
-  -- Battle.new refreshes stats BEFORE raising battle.started, so without this
-  -- an edited mon would fight with its DV-derived numbers.
-  mod.events:on("battle.started", function()
-    local ok, err = pcall(function()
-      local save = liveSave()
-      if type(save) ~= "table" then return end
-      local data = liveData()
-      for _, mon in ipairs(save.party or {}) do
-        if type(mon) == "table" and mon.g9TrainEdited then
-          applyModern(defFromData(data, mon), mon)
-        end
-      end
-    end)
-    if not ok then
-      mod.log:warn("g9_battle_sample: TRAIN battle-start reapply failed: %s",
-        tostring(err))
-    end
-  end)
-
-  -- --------------------------------------------------------------- geometry
-  -- Gen 1 gets the same 20%-larger window the engine's adv.stats screen uses
-  -- (explicit precedent); Gen 2 keeps 160x144 and identity coordinates.
-  local isGen1Boot = (gen == 1)
-  local S = isGen1Boot and 1.2 or 1.0
-  local UI_W = math.floor(160 * S + 0.5)
-  local UI_H = math.floor(144 * S + 0.5)
-  local function SX(v) return math.floor(v * S + 0.5) end
-
-  local function cell(text, x, y)
-    Font.draw(text, SX(x), SX(y))
-  end
-
-  -- Every option on this screen -- tab, button, stat row, nature/gender,
-  -- APPLY -- is drawn inside a frame.  `level` 2 adds a second, 1px-inner
-  -- frame and is how the cursor is shown: the tile font draws black glyphs on
-  -- transparent whatever the colour, so inversion is not available and the
-  -- weight of the frame is the only selection cue.
   local function frame(x, y, w, h, level)
-    love.graphics.rectangle("line", SX(x), SX(y), SX(w), SX(h))
+    love.graphics.rectangle("line", x, y, w, h)
     if (level or 1) > 1 then
-      love.graphics.rectangle("line", SX(x) + 1, SX(y) + 1,
-        math.max(0, SX(w) - 2), math.max(0, SX(h) - 2))
+      love.graphics.rectangle("line", x + 1, y + 1,
+        math.max(0, w - 2), math.max(0, h - 2))
+    end
+  end
+  local function cell(text, x, y)
+    return Font.draw(text, x, y)
+  end
+
+  -- A native Game Boy window ring, tiled from the engine's own border glyphs.
+  -- Font.drawBox is the usual way to get this look, but it takes TILE counts,
+  -- and this surface's 180-pixel height is 22.5 tiles -- drawBox would put its
+  -- bottom row at y=168 and leave a 4px gap down the sides.  Tiling the ring
+  -- here is exact at ANY size and lays down the same corner and edge glyphs
+  -- drawBox uses.
+  local function drawBorder(w, h)
+    local B = Font.BORDER
+    if not (B and B.tl and B.tr and B.bl and B.br and B.h and B.v) then
+      Font.drawBox(0, 0, w / 8, h / 8)
+      return
+    end
+    Font.drawCode(B.tl, 0, 0)
+    Font.drawCode(B.tr, w - 8, 0)
+    Font.drawCode(B.bl, 0, h - 8)
+    Font.drawCode(B.br, w - 8, h - 8)
+    for x = 8, w - 16, 8 do
+      Font.drawCode(B.h, x, 0)
+      Font.drawCode(B.h, x, h - 8)
+    end
+    for y = 8, h - 8, 8 do
+      Font.drawCode(B.v, 0, y)
+      Font.drawCode(B.v, w - 8, y)
     end
   end
 
-  -- <male> and <female> are single font tiles on BOTH generations: codes 239
-  -- and 245 (constants/charmap.asm; the yellow ROM manifest carries the same
-  -- pair, and the engine's own naming/summary screens print them).  Drawn by
-  -- code rather than by the charmap's multi-byte sequence so the symbol is
-  -- there whatever a generation's charmap happens to carry.
-  local GENDER_CODE = { male = 239, female = 245 }
-  local function drawGender(gender, x, y)
-    local code = GENDER_CODE[gender]
-    if code then Font.drawCode(code, SX(x), SX(y)) end
-  end
-
-  -- The gender tab prints BOTH symbols as its label, so the one the mon is
-  -- currently set to is marked with a 1px rule along the tile's own baseline.
-  -- That is the only pixel row still free inside the tab -- a focused tab's
-  -- double frame already owns the rows above and below the tile -- and the
-  -- 1px weight is the cue this screen uses for every other selection, since
-  -- the tile font draws black on transparent whatever the colour.  An unknown
-  -- gender (a mon the engine never gave one) is simply left unmarked.
-  local function drawGenderRule(gender, x, y)
-    if not GENDER_CODE[gender] then return end
-    love.graphics.rectangle("fill", SX(x), SX(y + 8), SX(8), 1)
-  end
-
-  local function clamp(v, lo, hi)
-    if v < lo then return lo end
-    if v > hi then return hi end
-    return v
-  end
-
-  -- --------------------------------------------------------------- the screen
-  -- Editing fees.  An IV point costs IV_COST, an EV point EV_COST, and a
-  -- nature change a flat NATURE_COST; gender is free.  A fee is charged per
-  -- point of difference from the mon's CURRENT (last committed) value, so
-  -- moving a value back toward where it started refunds its points.  Nothing
-  -- is charged until the screen's APPLY action, which pays the whole total.
-  local IV_COST = 50
-  local EV_COST = 35
-  local NATURE_COST = 2000
-
-  -- Tab indices.  The gender tab carries no text label -- it prints the two
-  -- single-tile gender symbols instead -- so it is marked by `gender = true`.
-  local TAB_IV, TAB_EV, TAB_NAT, TAB_GENDER, TAB_MOVES = 1, 2, 3, 4, 5
-  local TAB_COUNT = 5
-
-  -- The nudge row, one button set per editing page (explicit user spec: the EV
-  -- page gets the wide jumps).  An EV point is a fifth of an IV point and a
-  -- stock EV runs to 252, so single-point steps are useless there: the EV page
-  -- steps in 4s, 12s and 128s with a 0 reset, while the IV page keeps its
-  -- single-point +/- and its 0/31 binders.  A button either adds `delta` to the
-  -- stat under the cursor or writes `set` outright.  `pad` is the frame
-  -- padding around each label and `gap` the space between buttons; the EV row
-  -- is seven buttons wide and only just fits the 160-wide window, so it runs
-  -- with 1px padding and no gaps (adjacent frames share their edge line, which
-  -- reads as one segmented strip).
-  local BUTTONS = {
-    [TAB_IV] = { pad = nil, gap = 8, buttons = {
-      { label = "+", delta = 1 },
-      { label = "-", delta = -1 },
-      { label = "0", set = 0 },
-      { label = "31", set = 31 },
-    } },
-    [TAB_EV] = { pad = 1, gap = 0, buttons = {
-      { label = "4", delta = 4 },
-      { label = "-4", delta = -4 },
-      { label = "+12", delta = 12 },
-      { label = "-12", delta = -12 },
-      { label = "+128", delta = 128 },
-      { label = "-128", delta = -128 },
-      { label = "0", set = 0 },
-    } },
-  }
-  -- The set the given page edits with; the IV set is the fallback for any page
-  -- that has no nudge row at all (the tab walks and applyButton both guard on
-  -- IV/EV anyway, but the accessor stays total).
-  local function buttonsFor(page) return BUTTONS[page] or BUTTONS[TAB_IV] end
-
-  local TABS = {
-    { label = "IV" }, { label = "EV" }, { label = "NAT" },
-    { gender = true }, { label = "MOVES" },
-  }
-
-  -- Design space is the Gen 2 window, 160x144; Gen 1 scales every coordinate
-  -- through SX().  Each band below is a row of framed options.
-  local DESIGN_W = 160
-  local TAB_Y, TAB_H = 9, 12
-  local TAB_PAD, TAB_GAP = 2, 2
-  local SET_Y, SET_H = 22, 12
-  local HEADER_Y = 35
-  local ROW_TOP, ROW_STEP, ROW_H = 44, 10, 10
-  local TABLE_X, TABLE_W = 2, 122
-  local FOOTER_Y, FOOTER_H = 105, 12
-  local STATUS_Y = 119
-  local COST_Y = 129
-  local COL_LABEL, COL_IV, COL_EV, COL_ST = 10, 44, 68, 96
-  local VISIBLE_MOVES = 8
-
-  -- Lay a row of framed labels out centred in the window: each option is its
-  -- own text width plus `pad` either side, with `gap` between them.  `pad`
-  -- defaults to TAB_PAD.
-  local function layoutRow(labels, gap, pad)
-    pad = pad or TAB_PAD
-    local widths, total = {}, 0
-    for i, label in ipairs(labels) do
-      widths[i] = label * 8 + 2 * pad
-      total = total + widths[i]
-      if i > 1 then total = total + gap end
-    end
-    local xs = {}
-    local x = math.floor((DESIGN_W - total) / 2 + 0.5)
-    for i = 1, #labels do
-      xs[i] = x
-      x = x + widths[i] + gap
-    end
-    return xs, widths
-  end
-
-  -- Measure and place each page's nudge row once, up front.
-  for _, set in pairs(BUTTONS) do
-    local glyphs = {}
-    for i, button in ipairs(set.buttons) do glyphs[i] = #button.label end
-    set.x, set.w = layoutRow(glyphs, set.gap, set.pad)
-  end
-
-  -- The tab strip mixes text tabs and the symbol tab, so measure by glyphs.
-  local TAB_GLYPHS = {}
-  for i, tab in ipairs(TABS) do
-    TAB_GLYPHS[i] = tab.gender and 2 or #tab.label
-  end
-  local TAB_X, TAB_W = layoutRow(TAB_GLYPHS, TAB_GAP)
+  -- The border ring is one 8px tile thick, so every band lives inside
+  -- [MARGIN, UI_W - MARGIN] / [MARGIN, UI_H - MARGIN] and the header, the name
+  -- rows, the grid and the hints all clear it.
+  local MARGIN = 12
+  local CONTENT_R = UI_W - MARGIN
+  -- Header: the two filters in the top corners (START/SELECT cycle them)
+  -- with the title centred between, then a hairline rule.
+  local HEADER_Y, DIVIDER_Y = 12, 24
+  -- Nine name rows down the left, each framed; the cursor's row is framed
+  -- twice.  A 180-wide column fits a 21-glyph name at this font.
+  local NAME_X, NAME_W = MARGIN, 180
+  local NAME_Y0, NAME_STEP, NAME_H = 34, 12, 11
+  local NAME_PAD = 4
+  local NAME_MAX = 21
+  -- The 3x3 generation grid down the right, then a [MEGA] [GIGA] row, then the
+  -- RESET bar under it.  Cells are 34 wide on a 2px gutter: 202 + 34*3 + 2*2 =
+  -- 308 = the content edge, and three 15-tall rows sit between y=34 and y=87.
+  -- The form row reuses the same content width as two 52-wide cells (2px
+  -- gutter), and RESET sits below it, pushed down out of the form row's way
+  -- (explicit user request, 2026-09-19).
+  local GRID_X = { 202, 238, 274 }
+  local GRID_Y = { 34, 53, 72 }
+  local GRID_W, GRID_H = 34, 15
+  local FORM_Y, FORM_W, FORM_GAP = 94, 52, 2
+  local FORM_X = { 202, 202 + FORM_W + FORM_GAP }
+  local RESET_X, RESET_Y, RESET_W = 202, 113, 106
+  -- Divider above the hints, then the two hint lines and the right-aligned
+  -- status.  y=164 + the 8px glyph is the last row inside the bottom ring.
+  local DIVIDER_Y2 = 148
+  local HINT_Y1, HINT_Y2 = 154, 164
 
   local Screen = {}
   Screen.__index = Screen
   Screen.isOpaque = true
-  Screen.screenId = "G9Train"
+  Screen.screenId = "G9Blacklist"
 
   function Screen:uiSize() return UI_W, UI_H end
 
-  local function natureIndex(mon)
-    local nature = mon and mon.nature
-    for i, name in ipairs(NATURES) do
-      if name == nature then return i end
+  -- This is a WIDE owner: it tells the engine the whole 320x180 surface is
+  -- its own layout, the same marker the engine's own wide battle and the
+  -- sprites mod's party screen carry.  Game:draw (Gen 1) then sizes the
+  -- surface to this state's uiSize() wherever it sits in the stack, and draws
+  -- the screen at the surface origin instead of shifting it by the classic-UI
+  -- offset.  (A state that answers uiSize() alone is sized the same way when
+  -- it is the top state; the marker additionally HOLDS the surface while a
+  -- prompt is pushed over it.)  It never touches Renderer itself -- see
+  -- Screen:draw.  Gen 2 has NO such seam; see the panel contract below.
+  function Screen:isWideBattleLayout() return true end
+
+  -- Fill the letterbox around the surface with the window's own paper rather
+  -- than flat black, so a window that is not an exact multiple reads as one
+  -- continuous screen (the same opt-in the engine's battle screens use).
+  Screen.letterboxWhite = true
+
+  -- Gen 2's panel contract.  src/core/Game2.lua composes the window itself
+  -- and NEVER reads a state's uiSize() or calls Renderer:setUISize -- which is
+  -- the only reason a 240x216 surface came out clipped to the classic 160x144
+  -- on Gold, with the header and grid cut off at the edges.  A screen wider
+  -- than 160x144 therefore has to supply that generation's own contract --
+  -- drawsWidescreen() + drawWidescreen(winW, winH) + panelSize() -- exactly
+  -- as src/ui/gen2/BattleState.lua, PartyMenu and the WideBattle scene do.
+  -- Both seams answer from the SAME size, so one layout serves both gens.
+  function Screen:panelSize() return UI_W, UI_H end
+
+  function Screen:battlePanelScale(winW, winH) return self:panelScale(winW, winH) end
+
+  -- Whole window pixels per surface pixel, so the 8px grid every frame and
+  -- glyph sits on stays aligned.  Chrome owns the playfield/skin maths, so it
+  -- is preferred; the plain floor is the same answer without a skin.
+  function Screen:panelScale(winW, winH)
+    local ok, Chrome = pcall(require, "src.ui.gen2.Chrome")
+    if ok and type(Chrome) == "table" and Chrome.fitScaleFor then
+      local okScale, scale = pcall(Chrome.fitScaleFor, winW, winH,
+        UI_W / 8, UI_H / 8)
+      if okScale and type(scale) == "number" and scale >= 1 then
+        return scale
+      end
     end
-    return nil
+    if not (winW > 0 and winH > 0) then return 1 end
+    return math.max(1, math.floor(math.min(winW / UI_W, winH / UI_H)))
   end
 
-  function Screen.new(game, mon)
-    local def = defFor(game, mon)
-    -- Idempotent top-ups, same as the engine's own adv.stats screen: a mon
-    -- that has never been through a battle still shows a real nature/gender.
-    pcall(ModernStats.generateNature, mon)
-    pcall(ModernStats.generateGender, mon)
-    if def then pcall(ModernStats.ensure, def, mon) end
+  function Screen:drawsWidescreen() return true end
 
+  -- Gen 2's draw entry: paint the surround, then draw the surface at the
+  -- whole-pixel scale into it.  draw() itself is always in surface pixels, so
+  -- this is the only place the window scale lives on Gold.
+  function Screen:drawWidescreen(winW, winH)
+    local G = love.graphics
+    local scale = self:panelScale(winW, winH)
+    local ox, oy = 0, 0
+    local ok, Chrome = pcall(require, "src.ui.gen2.Chrome")
+    if ok and type(Chrome) == "table" and Chrome.letterbox then
+      pcall(Chrome.letterbox, winW, winH, 1, 1, 1)
+      local okO, x, y = pcall(Chrome.fitOriginFor, winW, winH, scale,
+        UI_W / 8, UI_H / 8)
+      if okO and type(x) == "number" then ox, oy = x, y end
+    else
+      G.setColor(1, 1, 1, 1)
+      G.rectangle("fill", 0, 0, winW, winH)
+      ox = math.floor((winW - UI_W * scale) / 2 + 0.5)
+      oy = math.floor((winH - UI_H * scale) / 2 + 0.5)
+    end
+    G.push("all")
+    G.translate(ox, oy)
+    G.scale(scale, scale)
+    self:draw()
+    G.pop()
+  end
+
+  -- Rows 1..3 are the 3x3 generation grid, row 4 is the [MEGA] [GIGA] pair and
+  -- row 5 is the full-width RESET bar (pushed below the form row; explicit user
+  -- request, 2026-09-19).
+  local ROW_FORMS, ROW_RESET = 4, 5
+  function Screen:gridCellCount(row)
+    if row >= ROW_RESET then return 1 end
+    if row == ROW_FORMS then return 2 end
+    return 3
+  end
+
+  function Screen:clampGridCol()
+    local n = self:gridCellCount(self.gridRow)
+    if self.gridCol > n then self.gridCol = n end
+    if self.gridCol < 1 then self.gridCol = 1 end
+  end
+
+  function Screen:clampScroll()
+    local n = #self.filtered
+    if self.listIndex < 1 then self.listIndex = 1 end
+    if n > 0 and self.listIndex > n then self.listIndex = n end
+    if self.listIndex <= self.listScroll then
+      self.listScroll = self.listIndex
+    end
+    if self.listIndex > self.listScroll + VISIBLE_NAMES - 1 then
+      self.listScroll = self.listIndex - VISIBLE_NAMES + 1
+    end
+    local maxScroll = math.max(1, n - VISIBLE_NAMES + 1)
+    if self.listScroll > maxScroll then self.listScroll = maxScroll end
+    if self.listScroll < 1 then self.listScroll = 1 end
+  end
+
+  -- The current filter's list: generation AND starting letter, both active at
+  -- once (the request's own example filters gen 1 on the letter A).
+  function Screen:rebuild()
+    self.filtered = {}
+    local index = shared.buildBlacklistIndex()
+    local letter = string.char(64 + self.letter)
+    for _, entry in ipairs(index or {}) do
+      if entry.gen == self.gen then
+        local first = string.sub(entry.name, 1, 1):upper()
+        if first == letter then self.filtered[#self.filtered + 1] = entry end
+      end
+    end
+    self.listScroll = 1
+    self.listIndex = #self.filtered > 0 and 1 or 0
+  end
+
+  function Screen.new(game)
     local self = setmetatable({
-      game = game, mon = mon, def = def,
-      mode = "stats", focus = "tabs", page = TAB_IV, row = 1, col = 1,
-      nature = mon.nature, gender = mon.gender,
-      baseNature = mon.nature, baseGender = mon.gender,
-      category = 1, moveIndex = 1, moveList = {},
-      pending = nil, pickingSlot = false, slotIndex = 1,
-      status = "", broken = false,
-      ivs = {}, evs = {}, baseIvs = {}, baseEvs = {},
+      game = game, gen = 1, letter = 1,
+      focus = "list", listIndex = 1, listScroll = 1, filtered = {},
+      gridRow = 1, gridCol = 1, status = "", broken = false,
     }, Screen)
-    for _, key in ipairs(STAT_ORDER) do
-      self.ivs[key] = clamp(tonumber(mon.ivs and mon.ivs[key]) or 0, 0, 31)
-      self.evs[key] = clamp(tonumber(mon.evs and mon.evs[key]) or 0, 0, 252)
-    end
-    for _, key in ipairs(STAT_ORDER) do
-      self.baseIvs[key] = self.ivs[key]
-      self.baseEvs[key] = self.evs[key]
-    end
+    pcall(self.rebuild, self)
     return self
   end
 
-  function Screen:evTotal()
-    local total = 0
-    for _, key in ipairs(STAT_ORDER) do total = total + (self.evs[key] or 0) end
-    return total
-  end
-
-  -- How many rows of stats the current tab edits: the six stats on IV and EV,
-  -- and a single value on the NAT and gender tabs (whose value is drawn in
-  -- the footer rather than the table).  APPLY is no longer a row of its own
-  -- -- it is a focus of the whole screen (explicit user spec).
-  function Screen:statRowCount()
-    return (self.page == TAB_IV or self.page == TAB_EV) and #STAT_ORDER or 1
-  end
-
-  -- What the STAGED edits would cost: IV_COST per IV point changed plus
-  -- EV_COST per EV point changed -- each counted from the mon's last
-  -- committed value, so an undone edit costs nothing again -- plus a flat
-  -- NATURE_COST when the nature differs.  Gender is free.
-  function Screen:pendingCost()
-    local cost = 0
-    for _, key in ipairs(STAT_ORDER) do
-      cost = cost + IV_COST
-        * math.abs((self.ivs[key] or 0) - (self.baseIvs[key] or 0))
-      cost = cost + EV_COST
-        * math.abs((self.evs[key] or 0) - (self.baseEvs[key] or 0))
-    end
-    if self.nature ~= self.baseNature then cost = cost + NATURE_COST end
-    return cost
-  end
-
-  function Screen:hasChanges()
-    if self:pendingCost() > 0 then return true end
-    return (self.gender or "") ~= (self.baseGender or "")
-  end
-
-  -- The live preview of the six computed stats for the working copy -- the pure
-  -- ModernStats.computeAll, so nothing on the mon is touched until commit.
-  function Screen:preview()
-    if not (self.def and type(self.def.baseStats) == "table") then return nil end
-    return ModernStats.computeAll(self.def.baseStats, self.ivs, self.evs,
-      self.mon.level, self.nature)
-  end
-
-  -- Write the working copy onto the mon and recompute through the engine's own
-  -- recalcAll.  Only the APPLY action calls this: every button and page just
-  -- stages the working copy, so an unaffordable purchase leaves the mon
-  -- exactly as it was.
-  function Screen:commit()
-    local mon = self.mon
-    mon.ivs = mon.ivs or {}
-    mon.evs = mon.evs or {}
-    for _, key in ipairs(STAT_ORDER) do
-      mon.ivs[key] = self.ivs[key] or 0
-      mon.evs[key] = self.evs[key] or 0
-    end
-    if self.nature ~= nil then mon.nature = self.nature end
-    if self.gender ~= nil then mon.gender = self.gender end
-    applyModern(self.def, mon)
-  end
-
-  function Screen:applyButton()
-    if self.page ~= TAB_IV and self.page ~= TAB_EV then return end
-    if self.row > #STAT_ORDER then return end
-    local store = (self.page == TAB_IV) and self.ivs or self.evs
-    local key = STAT_ORDER[self.row]
-    local button = buttonsFor(self.page).buttons[self.col]
-    if not button then return end
-    local value
-    if button.set ~= nil then
-      value = button.set
-    else
-      value = (store[key] or 0) + button.delta
-    end
-    if self.page == TAB_IV then
-      store[key] = clamp(value, 0, 31)
-    else
-      -- Real EV rules: 252 per stat, 510 across all six.
-      local others = self:evTotal() - (store[key] or 0)
-      store[key] = clamp(math.min(clamp(value, 0, 252), 510 - others), 0, 252)
-    end
-    self.status = ""
-  end
-
-  function Screen:cycleNature(step)
-    if #NATURES == 0 then return end
-    local index = natureIndex(self) or 0
-    index = ((index - 1 + step) % #NATURES) + 1
-    self.nature = NATURES[index]
-    self.status = ""
-  end
-
-  function Screen:toggleGender()
-    self.gender = (self.gender == "female") and "male" or "female"
-    self.status = ""
-  end
-
-  -- Charge the staged total and write the working copy onto the mon.  An
-  -- unaffordable total changes nothing at all (no partial spend, no partial
-  -- commit); a successful one moves the baseline forward, so the cost reads 0
-  -- again and the next edits are priced from the mon's new values.
-  function Screen:applyAll()
-    if not self:hasChanges() then self.status = "NO CHANGE"; return end
-    local cost = self:pendingCost()
-    local save = liveSave()
-    if moneyOf(save) < cost then
-      self.status = string.format("NEED %d", cost)
-      return
-    end
-    if cost > 0 then setMoney(save, moneyOf(save) - cost) end
-    self:commit()
-    for _, key in ipairs(STAT_ORDER) do
-      self.baseIvs[key] = self.ivs[key]
-      self.baseEvs[key] = self.evs[key]
-    end
-    self.baseNature = self.nature
-    self.baseGender = self.gender
-    self.status = cost > 0 and string.format("APPLIED -%d", cost) or "APPLIED"
-  end
-
-  -- ------------------------------------------------------------ move pool
-  local movePoolCache = {}
-  function Screen:buildMoveList()
-    self.moveList = {}
-    self.moveHint = nil
-    local nd = ndExports()
-    if not (nd and type(nd.statsBySpecies) == "function") then
-      self.moveHint = "NEEDS NATIONAL DEX"
-      return
-    end
-    local ok, rec = pcall(nd.statsBySpecies, self.mon.species)
-    if not (ok and type(rec) == "table") then
-      self.moveHint = "NO DEX DATA"
-      return
-    end
-    self.mon.moves = self.mon.moves or {}
-    local known = {}
-    for _, move in ipairs(self.mon.moves) do
-      if move and move.id then known[move.id] = true end
-    end
-    local data = self.game and self.game.data
-    local seen = {}
-    local function consider(moveId)
-      if type(moveId) ~= "string" or moveId == "" then return end
-      if seen[moveId] or known[moveId] then return end
-      local moveDef = data and data.moves and data.moves[moveId]
-      if not moveDef then return end
-      -- The engine's own "can this actually be run yet" gate, when exported.
-      if engineExports and type(engineExports.isMoveUsable) == "function" then
-        local okCall, usable = pcall(engineExports.isMoveUsable, moveId)
-        if okCall and usable == false then return end
-      end
-      seen[moveId] = true
-      self.moveList[#self.moveList + 1] = {
-        id = moveId, name = moveDef.name or moveId,
-      }
-    end
-    if self.category == 1 then
-      -- Relearn: level-up moves at or below the mon's current level.
-      for _, entry in ipairs(rec.movesFull or {}) do
-        if (entry.level or 1) <= (self.mon.level or 1) then
-          consider(entry.move)
-        end
-      end
-    elseif self.category == 2 then
-      for _, entry in ipairs((rec.movesByMethod or {}).egg or {}) do
-        consider(entry.move)
-      end
-    else
-      for _, entry in ipairs((rec.movesByMethod or {}).tutor or {}) do
-        consider(entry.move)
-      end
-    end
-    table.sort(self.moveList, function(a, b) return a.name < b.name end)
-    if self.moveIndex > #self.moveList then
-      self.moveIndex = math.max(1, #self.moveList)
-    end
-  end
-
-  function Screen:chooseMove()
-    local entry = self.moveList[self.moveIndex]
-    self.status = ""
-    if not entry then self.status = "NO MOVE"; return end
-    if moneyOf(liveSave()) < MOVE_COST then self.status = "NEED 5000"; return end
-    local moves = self.mon.moves or {}
-    if #moves < 4 then
-      self.pending = { entry = entry, slot = #moves + 1 }
-    else
-      self.pickingSlot = true
-      self.slotIndex = 1
-    end
-  end
-
-  function Screen:writeMove(entry, slot)
-    local mon = self.mon
-    mon.moves = mon.moves or {}
-    local data = self.game and self.game.data
-    local moveDef = data and data.moves and data.moves[entry.id]
-    local pp = (moveDef and moveDef.pp) or 0
-    local newEntry = { id = entry.id, pp = pp }
-    -- Gen 2's move records carry maxPp; Gen 1's do not (Mon.learnMove vs
-    -- BattleState:learnMove).
-    if gen == 2 then newEntry.maxPp = pp end
-    mon.moves[slot] = newEntry
-    local ok, Runtime = pcall(require, "src.mods.Runtime")
-    if ok and type(Runtime) == "table" and type(Runtime.emit) == "function" then
-      pcall(Runtime.emit, "pokemon.move_learned",
-        { mon = mon, moveId = entry.id })
-    end
-  end
-
-  function Screen:doTeach()
-    local pending = self.pending
-    self.pending = nil
-    if not pending then return end
-    local save = liveSave()
-    if moneyOf(save) < MOVE_COST then self.status = "NEED 5000"; return end
-    local old = (self.mon.moves or {})[pending.slot]
-    if old and HM_MOVES[old.id] then self.status = "CAN'T FORGET HM"; return end
-    setMoney(save, moneyOf(save) - MOVE_COST)
-    self:writeMove(pending.entry, pending.slot)
-    self.status = "LEARNED " .. pending.entry.name
-    self:buildMoveList()
-  end
-
-  -- --------------------------------------------------------------- input
   local function safeCall(self, label, fn)
     local ok, err = pcall(fn)
     if not ok then
-      mod.log:warn("g9_battle_sample: train_screen: %s errored, closing (%s)",
+      mod.log:warn(
+        "g9_battle_sample: blacklist_screen: %s errored, closing (%s)",
         label, tostring(err))
       self.broken = true
     end
   end
 
-  -- Three focuses, moved between by the D-pad (explicit user spec):
-  --   "tabs"  -- the framed tab strip along the top.  LEFT/RIGHT walks the
-  --              five tabs; UP/DOWN drops to APPLY; A enters the tab's rows
-  --              (or, on MOVES, opens screen two).
-  --   "rows"  -- the tab's own rows.  On IV/EV: LEFT/RIGHT cycles that page's
-  --              nudge buttons (the IV set: + / - / 0 / 31; the EV set: 4 / -4
-  --              / +12 / -12 / +128 / -128 / 0), UP/DOWN walks the six stats,
-  --              A runs the button.  On NAT and the gender tab there is a
-  --              single value, so LEFT/RIGHT (or A) changes it and UP/DOWN goes
-  --              back up to APPLY.
-  --   "apply" -- the APPLY button.  A buys the staged edits, UP/DOWN returns
-  --              to the tab strip.
-  function Screen:updateStats(input)
-    if self.focus == "apply" then
-      if input:wasPressed("a") then
-        self:applyAll()
-      elseif input:wasPressed("up") or input:wasPressed("down") then
-        self.focus = "tabs"
-      end
-      return
-    end
-
-    if self.focus == "tabs" then
-      if input:wasPressed("left") then
-        self.page = ((self.page - 2) % TAB_COUNT) + 1
-        self.row = 1
-        self.col = 1
-        self.status = ""
-      elseif input:wasPressed("right") then
-        self.page = (self.page % TAB_COUNT) + 1
-        self.row = 1
-        self.col = 1
-        self.status = ""
-      elseif input:wasPressed("up") or input:wasPressed("down") then
-        self.focus = "apply"
-      elseif input:wasPressed("a") then
-        if self.page == TAB_MOVES then
-          self.mode = "moves"
-          self:buildMoveList()
-          self.moveIndex = 1
-        else
-          self.focus = "rows"
-          self.row = 1
-        end
-      end
-      return
-    end
-
-    -- focus == "rows"
-    if self.page == TAB_IV or self.page == TAB_EV then
-      if input:wasPressed("up") then
-        self.row = ((self.row - 2) % #STAT_ORDER) + 1
-      elseif input:wasPressed("down") then
-        self.row = (self.row % #STAT_ORDER) + 1
-      elseif input:wasPressed("left") or input:wasPressed("right") then
-        local step = input:wasPressed("right") and 1 or -1
-        self.col = ((self.col - 1 + step) % #buttonsFor(self.page).buttons) + 1
-      elseif input:wasPressed("a") then
-        self:applyButton()
-      end
-      return
-    end
-
-    if input:wasPressed("left") or input:wasPressed("right") then
-      local step = input:wasPressed("right") and 1 or -1
-      if self.page == TAB_NAT then
-        self:cycleNature(step)
-      else
-        self:toggleGender()
-      end
-    elseif input:wasPressed("up") or input:wasPressed("down") then
-      self.focus = "apply"
-    elseif input:wasPressed("a") then
-      if self.page == TAB_NAT then
-        self:cycleNature(1)
-      else
-        self:toggleGender()
-      end
-    end
+  -- LEFT/RIGHT cross between the name list and the generation grid, which the
+  -- request reads as one horizontal run of options: the list is the leftmost
+  -- column, and RIGHT walks it into that row's cells -- G1 > G2 > G3 -- then
+  -- back to the list, with LEFT the same run reversed.  The [MEGA] [GIGA] row
+  -- and the RESET bar are rows of their own that only UP/DOWN reach, so a grid
+  -- entry that lands outside the three generation rows (i.e. was left sitting
+  -- on one of them) starts on the first.
+  function Screen:enterGrid(col)
+    self.focus = "grid"
+    if self.gridRow < 1 or self.gridRow > 3 then self.gridRow = 1 end
+    if col < 0 then col = self:gridCellCount(self.gridRow) end
+    self.gridCol = col
   end
 
-  function Screen:updateMoves(input)
-    if input:wasPressed("left") then
-      self.category = ((self.category - 2) % 3) + 1
-      self:buildMoveList()
-    elseif input:wasPressed("right") then
-      self.category = (self.category % 3) + 1
-      self:buildMoveList()
-    elseif input:wasPressed("up") then
-      if #self.moveList > 0 then
-        self.moveIndex = ((self.moveIndex - 2) % #self.moveList) + 1
-      end
-    elseif input:wasPressed("down") then
-      if #self.moveList > 0 then
-        self.moveIndex = (self.moveIndex % #self.moveList) + 1
-      end
-    elseif input:wasPressed("a") then
-      self:chooseMove()
-    end
+  function Screen:leaveGrid()
+    self.focus = "list"
+    if self.gridRow >= ROW_RESET then self.gridRow = 1 end
   end
 
-  function Screen:updateSlotPicker(input)
-    local moves = self.mon.moves or {}
-    local count = math.max(1, #moves)
+  function Screen:updateList(input)
     if input:wasPressed("up") then
-      self.slotIndex = ((self.slotIndex - 2) % count) + 1
-    elseif input:wasPressed("down") then
-      self.slotIndex = (self.slotIndex % count) + 1
-    elseif input:wasPressed("b") then
-      self.pickingSlot = false
-    elseif input:wasPressed("a") then
-      local old = moves[self.slotIndex]
-      self.pickingSlot = false
-      if old and HM_MOVES[old.id] then
-        self.status = "CAN'T FORGET HM"
-        return
+      if self.listIndex <= 1 then
+        self.focus = "grid"
+        self.gridRow = ROW_RESET
+        self:clampGridCol()
+      else
+        self.listIndex = self.listIndex - 1
+        self:clampScroll()
       end
-      self.pending = { entry = self.moveList[self.moveIndex],
-        slot = self.slotIndex }
+    elseif input:wasPressed("down") then
+      if #self.filtered == 0 or self.listIndex >= #self.filtered then
+        self.focus = "grid"
+        self.gridRow = 1
+        self:clampGridCol()
+      else
+        self.listIndex = self.listIndex + 1
+        self:clampScroll()
+      end
+    elseif input:wasPressed("right") then
+      self:enterGrid(1)
+    elseif input:wasPressed("left") then
+      self:enterGrid(-1)
+    elseif input:wasPressed("a") then
+      local entry = self.filtered[self.listIndex]
+      if entry then
+        shared.blacklistToggle(entry.id)
+        self.status = ""
+      end
     end
   end
 
-  function Screen:updateConfirm(input)
-    if input:wasPressed("a") then
-      self:doTeach()
-    elseif input:wasPressed("b") then
-      self.pending = nil
-      self.status = "CANCELLED"
+  function Screen:updateGrid(input)
+    if input:wasPressed("up") then
+      if self.gridRow > 1 then
+        self.gridRow = self.gridRow - 1
+        self:clampGridCol()
+      end
+    elseif input:wasPressed("down") then
+      if self.gridRow < ROW_RESET then
+        self.gridRow = self.gridRow + 1
+        self:clampGridCol()
+      else
+        self.focus = "list"
+      end
+    elseif input:wasPressed("left") then
+      -- The list sits immediately left of the row's first cell, so LEFT off
+      -- that cell (or off the single-cell RESET bar) returns to it.
+      if self.gridCol <= 1 then
+        self:leaveGrid()
+      else
+        self.gridCol = self.gridCol - 1
+      end
+    elseif input:wasPressed("right") then
+      -- ... and RIGHT off the last cell wraps back to the list, so the row's
+      -- own cells > list > first cell cycle on the one key.
+      if self.gridCol >= self:gridCellCount(self.gridRow) then
+        self:leaveGrid()
+      else
+        self.gridCol = self.gridCol + 1
+      end
+    elseif input:wasPressed("a") then
+      if self.gridRow >= ROW_RESET then
+        shared.blacklistReset()
+        self.status = "RESET"
+      elseif self.gridRow == ROW_FORMS then
+        -- Column 1 = Mega, column 2 = Gigantamax.
+        shared.blacklistFormGroupToggle(self.gridCol == 2 and "gmax" or "mega")
+        self.status = ""
+      else
+        local g = (self.gridRow - 1) * 3 + self.gridCol
+        shared.blacklistGenToggle(g)
+        self.status = ""
+      end
     end
   end
 
@@ -2960,265 +3604,181 @@ local function installTrainScreen(mod, gen, shared)
       return
     end
     safeCall(self, "update", function()
-      local input = self.game.input
+      local input = self.game and self.game.input
       if not input then return end
-      if self.pending then self:updateConfirm(input); return end
-      if self.pickingSlot then self:updateSlotPicker(input); return end
+      -- START cycles the generation filter 1>2>...>9>1; SELECT cycles the
+      -- starting letter a>b>...>z>a.  Both work from either focus, which is
+      -- what the two top-corner indicators read.
       if input:wasPressed("start") then
+        self.gen = (self.gen % GEN_COUNT) + 1
+        self:rebuild()
         self.status = ""
-        if self.mode == "stats" then
-          self.mode = "moves"
-          self.page = TAB_MOVES
-          self:buildMoveList()
-          self.moveIndex = 1
-        else
-          self.mode = "stats"
-          self.page = TAB_MOVES
-          self.focus = "tabs"
-        end
         return
       end
-      -- B steps back one level at a time: a row/APPLY cursor returns to the
-      -- tab strip, the moves screen returns to the stats screen, and only a
-      -- B on the tab strip itself leaves the TRAIN screen.
+      if input:wasPressed("select") then
+        self.letter = (self.letter % LETTER_COUNT) + 1
+        self:rebuild()
+        self.status = ""
+        return
+      end
       if input:wasPressed("b") then
-        if self.mode == "moves" then
-          self.mode = "stats"
-          self.page = TAB_MOVES
-          self.focus = "tabs"
+        if self.focus == "grid" then
+          self.focus = "list"
           self.status = ""
-        elseif self.focus ~= "tabs" then
-          self.focus = "tabs"
         else
           self.game.stack:pop()
         end
         return
       end
-      if self.mode == "stats" then
-        self:updateStats(input)
+      if self.focus == "list" then
+        self:updateList(input)
       else
-        self:updateMoves(input)
+        self:updateGrid(input)
       end
     end)
   end
 
-  -- --------------------------------------------------------------- drawing
-  -- The tab strip: five framed options, the current one framed twice.  The
-  -- gender tab carries no text -- it prints the two single-tile symbols as its
-  -- label, with a rule under whichever one the mon is currently set to (so the
-  -- tab reads as a two-way menu with its current value marked).
-  function Screen:drawTabs()
-    for i, tab in ipairs(TABS) do
-      local level = (self.focus == "tabs" and self.page == i) and 2 or 1
-      frame(TAB_X[i], TAB_Y, TAB_W[i], TAB_H, level)
-      local tx, ty = TAB_X[i] + TAB_PAD, TAB_Y + 2
-      if tab.gender then
-        drawGender("male", tx, ty)
-        drawGender("female", tx + 8, ty)
-        local current = (self.gender == "female") and tx + 8 or tx
-        drawGenderRule(self.gender, current, ty)
-      else
-        Font.draw(tab.label, SX(tx), SX(ty))
+  function Screen:drawHeader()
+    -- Top-left: the generation filter (START cycles it).  Top-right: the
+    -- starting-letter filter (SELECT cycles it).  The title sits between.
+    cell(string.format("GEN:[%d]", self.gen), NAME_X, HEADER_Y)
+    local letter = string.char(64 + self.letter)
+    local letterText = string.format("LET:[%s]", letter)
+    cell(letterText, CONTENT_R - Font.width(letterText), HEADER_Y)
+    local title = "BLACKLIST"
+    cell(title, math.floor((UI_W - Font.width(title)) / 2 + 0.5), HEADER_Y)
+    love.graphics.rectangle("fill", MARGIN, DIVIDER_Y, CONTENT_R - MARGIN, 1)
+  end
+
+  function Screen:drawNames()
+    for slot = 1, VISIBLE_NAMES do
+      local index = self.listScroll + slot - 1
+      local entry = self.filtered[index]
+      local y = NAME_Y0 + (slot - 1) * NAME_STEP
+      local level = (self.focus == "list" and entry
+        and index == self.listIndex) and 2 or 1
+      frame(NAME_X, y, NAME_W, NAME_H, level)
+      if entry then
+        cell(string.sub(entry.name, 1, NAME_MAX), NAME_X + NAME_PAD, y + 2)
+        -- The delist mark the request's own sketch shows, right-aligned in
+        -- the row and read from the raw set so the row the player actually
+        -- toggled is the row marked.
+        if shared.blacklistRaw(entry.id) then
+          local mark = "[x]"
+          cell(mark, NAME_X + NAME_W - NAME_PAD - Font.width(mark), y + 2)
+        end
       end
     end
   end
 
-  -- The six stats, always visible whatever tab is current: the IV column, the
-  -- EV column and the resulting stat.  Every row is framed; the row the
-  -- cursor is on is framed twice.
-  function Screen:drawTable(preview, editable)
-    cell("IV", COL_IV, HEADER_Y)
-    cell("EV", COL_EV, HEADER_Y)
-    cell("ST", COL_ST, HEADER_Y)
-    for i, key in ipairs(STAT_ORDER) do
-      local y = ROW_TOP + (i - 1) * ROW_STEP
-      local level = (editable and self.focus == "rows" and self.row == i)
-        and 2 or 1
-      frame(TABLE_X, y, TABLE_W, ROW_H, level)
-      cell(STAT_LABEL[key], COL_LABEL, y + 1)
-      cell(string.format("%2d", self.ivs[key] or 0), COL_IV, y + 1)
-      cell(string.format("%3d", self.evs[key] or 0), COL_EV, y + 1)
-      local stat = preview and preview[key]
-      cell(stat and string.format("%3d", stat) or "---", COL_ST, y + 1)
-    end
-  end
-
-  -- The value strip under the table: the nature and the gender symbol, each
-  -- framed like every other option.  The one the cursor is on is framed twice.
-  -- The gender box is the VALUE, not a menu: it prints the current gender's
-  -- single symbol -- LEFT/RIGHT on the gender tab cycles the box in place --
-  -- and only falls back to printing both tiles for a mon the engine never gave
-  -- a gender at all.
-  function Screen:drawFooter()
-    local label = "NAT:" .. string.sub(tostring(self.nature or "----"), 1, 7)
-    local natLevel = (self.page == TAB_NAT and self.focus == "rows") and 2 or 1
-    frame(TABLE_X, FOOTER_Y, #label * 8 + 2 * TAB_PAD, FOOTER_H, natLevel)
-    Font.draw(label, SX(TABLE_X + TAB_PAD), SX(FOOTER_Y + 2))
-    local gx = TABLE_X + #label * 8 + 2 * TAB_PAD + 6
-    local genLevel = (self.page == TAB_GENDER and self.focus == "rows")
-      and 2 or 1
-    frame(gx, FOOTER_Y, 16 + 2 * TAB_PAD, FOOTER_H, genLevel)
-    if GENDER_CODE[self.gender] then
-      drawGender(self.gender, gx + 6, FOOTER_Y + 2)
-    else
-      drawGender("male", gx + TAB_PAD, FOOTER_Y + 2)
-      drawGender("female", gx + TAB_PAD + 8, FOOTER_Y + 2)
-    end
-  end
-
-  function Screen:drawHint()
-    local hint
-    if self.focus == "tabs" then
-      hint = "L/R:PICK A:OK"
-    elseif self.focus == "apply" then
-      hint = "A:APPLY B:BACK"
-    elseif self.page == TAB_IV or self.page == TAB_EV then
-      hint = "U/D:STAT L/R:VAL"
-    elseif self.page == TAB_NAT then
-      hint = "L/R:NATURE A:OK"
-    else
-      hint = "L/R:GENDER A:OK"
-    end
-    cell(self.status ~= "" and self.status or hint, 4, STATUS_Y)
-  end
-
-  -- Bottom-right corner: the staged total and the APPLY button beside it.
-  -- Drawn in design coordinates like everything else, so the right edge lands
-  -- on the window edge whatever the generation's scale is; the button is
-  -- framed, and framed twice while it holds the cursor.
-  function Screen:drawCostBar()
-    local costText = string.format("COST:%d", self:pendingCost())
-    local bw = #"APPLY" * 8 + 2 * TAB_PAD
-    local bx = DESIGN_W - 2 - bw
-    local cx = bx - 6 - #costText * 8
-    if cx < 2 then cx = 2 end
-    Font.draw(costText, SX(cx), SX(COST_Y))
-    frame(bx, COST_Y - 2, bw, 12, self.focus == "apply" and 2 or 1)
-    Font.draw("APPLY", SX(bx + TAB_PAD), SX(COST_Y))
-  end
-
-  function Screen:drawStats()
-    local mon = self.mon
-    local name = mon.nickname or (self.def and self.def.name) or mon.species
-      or "?"
-    cell("TRAIN " .. string.sub(tostring(name), 1, 12), 4, 1)
-    self:drawTabs()
-
-    local editable = (self.page == TAB_IV or self.page == TAB_EV)
-    if editable then
-      local set = buttonsFor(self.page)
-      for i, button in ipairs(set.buttons) do
-        local level = (self.focus == "rows" and self.col == i) and 2 or 1
-        frame(set.x[i], SET_Y, set.w[i], SET_H, level)
-        Font.draw(button.label, SX(set.x[i] + (set.pad or TAB_PAD)),
-          SX(SET_Y + 2))
+  function Screen:drawGrid()
+    local labelY = 3
+    for g = 1, GEN_COUNT do
+      local row = math.floor((g - 1) / 3) + 1
+      local col = ((g - 1) % 3) + 1
+      local x, y = GRID_X[col], GRID_Y[row]
+      local selected = (self.focus == "grid" and self.gridRow == row
+        and self.gridCol == col)
+      frame(x, y, GRID_W, GRID_H, selected and 2 or 1)
+      local label = string.format("G%d", g)
+      cell(label, x + math.floor((GRID_W - Font.width(label)) / 2 + 0.5),
+        y + labelY)
+      if shared.blacklistGenComplete(g) then
+        local mark = "X"
+        cell(mark, x + GRID_W - 4 - Font.width(mark), y + labelY)
       end
     end
-
-    self:drawTable(self:preview(), editable)
-    self:drawFooter()
-    self:drawHint()
-    self:drawCostBar()
-  end
-
-  function Screen:drawMoves()
-    cell("TRAIN MOVES", 4, 2)
-    cell("CAT: " .. MOVE_FIELD_LABELS[self.category], 4, 11)
-    cell(string.format("MONEY:%d COST:%d", moneyOf(liveSave()), MOVE_COST),
-      4, 20)
-
-    local list = self.moveList
-    if #list == 0 then
-      cell(self.moveHint or "NONE TO LEARN", 4, 40)
-    else
-      local top = 1
-      if #list > VISIBLE_MOVES then
-        top = clamp(self.moveIndex - math.floor(VISIBLE_MOVES / 2), 1,
-          #list - VISIBLE_MOVES + 1)
-      end
-      for i = 0, VISIBLE_MOVES - 1 do
-        local index = top + i
-        local entry = list[index]
-        if not entry then break end
-        local y = 32 + i * ROW_STEP
-        if index == self.moveIndex then cell(">", 2, y) end
-        cell(string.sub(entry.name, 1, 14), 12, y)
+    -- The [MEGA] [GIGA] row: two cell-wide tiles under the generations, each
+    -- carrying the group's own complete mark.  A is the whole-group toggle.
+    local forms = { { "MEGA", "mega" }, { "GIGA", "gmax" } }
+    for i = 1, #forms do
+      local x = FORM_X[i]
+      local selected = (self.focus == "grid" and self.gridRow == ROW_FORMS
+        and self.gridCol == i)
+      frame(x, FORM_Y, FORM_W, GRID_H, selected and 2 or 1)
+      local label = forms[i][1]
+      cell(label, x + math.floor((FORM_W - Font.width(label)) / 2 + 0.5),
+        FORM_Y + labelY)
+      if shared.blacklistFormGroupComplete(forms[i][2]) then
+        local mark = "X"
+        cell(mark, x + FORM_W - 4 - Font.width(mark), FORM_Y + labelY)
       end
     end
-    cell(self.status ~= "" and self.status or "L/R:CAT A:TEACH", 4, 122)
-    cell("ST/B:BACK TO TRAIN", 4, 132)
-
-    if self.pickingSlot then
-      local moves = self.mon.moves or {}
-      love.graphics.setColor(0, 0, 0, 1)
-      love.graphics.rectangle("fill", SX(16), SX(70), SX(128), SX(50))
-      love.graphics.setColor(1, 1, 1, 1)
-      love.graphics.rectangle("fill", SX(18), SX(72), SX(124), SX(46))
-      love.graphics.setColor(0, 0, 0, 1)
-      cell("FORGET WHICH?", 22, 74)
-      for i = 1, math.max(1, #moves) do
-        local y = 82 + (i - 1) * 9
-        if i == self.slotIndex then cell(">", 22, y) end
-        local move = moves[i]
-        local data = self.game and self.game.data
-        local def = move and data and data.moves and data.moves[move.id]
-        local label = def and def.name or (move and move.id) or "----"
-        if move and HM_MOVES[move.id] then label = label .. " (HM)" end
-        cell(string.sub(label, 1, 12), 30, y)
-      end
-      cell("A:OK B:BACK", 22, 112)
-    end
-
-    if self.pending then
-      love.graphics.setColor(0, 0, 0, 1)
-      love.graphics.rectangle("fill", SX(8), SX(58), SX(144), SX(36))
-      love.graphics.setColor(1, 1, 1, 1)
-      love.graphics.rectangle("fill", SX(10), SX(60), SX(140), SX(32))
-      love.graphics.setColor(0, 0, 0, 1)
-      cell("LEARN " .. string.sub(self.pending.entry.name, 1, 11) .. "?", 12, 64)
-      cell(string.format("FOR %d  A:YES B:NO", MOVE_COST), 12, 76)
-    end
+    local selected = (self.focus == "grid" and self.gridRow >= ROW_RESET)
+    frame(RESET_X, RESET_Y, RESET_W, GRID_H, selected and 2 or 1)
+    local resetLabel = "RESET"
+    cell(resetLabel,
+      RESET_X + math.floor((RESET_W - Font.width(resetLabel)) / 2 + 0.5),
+      RESET_Y + labelY)
   end
 
   function Screen:draw()
     if self.broken then return end
     safeCall(self, "draw", function()
+      -- A plain native window, drawn the way the engine's own screens draw
+      -- theirs: a white interior with the $79-$7e border tiles tiled around
+      -- the WHOLE surface (40 x 22.5 tiles).  That is the bigger canvas the
+      -- request asks for -- a vanilla Game Boy window made larger -- not a
+      -- small box floating in a big empty field.
+      --
+      -- NEVER call Renderer:setUISize / love.graphics.setCanvas from a draw.
+      -- Game:draw has already sized the surface from Screen:uiSize() before
+      -- the draw loop; re-binding it mid-frame is exactly the silent-crash
+      -- hazard stats/dev_stats_screen.lua's header documents, and the
+      -- round-175 "clip guard" that turned this screen into a white field.
+      -- Plain drawing only, the same contract adv.stats and
+      -- modern_stats_screen follow.
       love.graphics.setColor(1, 1, 1, 1)
       love.graphics.rectangle("fill", 0, 0, UI_W, UI_H)
+      drawBorder(UI_W, UI_H)
       love.graphics.setColor(0, 0, 0, 1)
-      if self.mode == "stats" then self:drawStats() else self:drawMoves() end
+      self:drawHeader()
+      self:drawNames()
+      self:drawGrid()
+      love.graphics.rectangle("fill", MARGIN, DIVIDER_Y2, CONTENT_R - MARGIN, 1)
+      cell("START:GEN  SELECT:LETTER", MARGIN, HINT_Y1)
+      cell("A:TOGGLE  B:BACK  L/R:MOVE", MARGIN, HINT_Y2)
+      if self.status ~= "" then
+        cell(self.status, CONTENT_R - Font.width(self.status), HINT_Y2)
+      end
       love.graphics.setColor(1, 1, 1, 1)
     end)
   end
 
-  -- --------------------------------------------------------------- the hook
-  mod.hooks:wrap("ui.party.submenu", function(nextFn, game, items, mon, ctx)
-    local result = nextFn(game, items, mon, ctx)
-    if type(result) ~= "table" then result = items end
+  -- --------------------------------------------------------------- the row
+  -- The same descriptor shape the engine's own OPTIONS rows use, so A opens
+  -- the screen on BOTH generations' menus (src/ui/OptionsMenu.lua's activate
+  -- and src/ui/gen2/OptionsMenu.lua's own A branch).
+  mod.hooks:wrap("ui.options.rows", function(nextFn, game, rows)
+    local result = nextFn(game, rows)
+    if type(result) ~= "table" then result = rows end
     if type(result) ~= "table" then return result end
-    -- Field list only (never the in-battle SWITCH/STATS box), and never an egg
-    -- -- an egg has nothing to train.
-    local isBattle = ctx and ctx.battle
-    local isEgg = type(mon) == "table" and mon.isEgg
-    local hasRoom = (isGen1Boot and true) or (#result < NUM_MONMENU_ITEMS)
-    if not isBattle and not isEgg and hasRoom then
-      result[#result + 1] = {
-        id = "TRAIN", label = "TRAIN",
-        onSelect = function(selectedMon, selectedGame)
-          local ok, screen = pcall(Screen.new, selectedGame, selectedMon)
-          if ok and screen then
-            selectedGame.stack:push(screen)
-          else
-            mod.log:warn("g9_battle_sample: TRAIN screen failed to open (%s)",
-              tostring(screen))
-          end
-        end,
-      }
-    end
+    result[#result + 1] = {
+      id = "blacklist",
+      label = "BLACKLIST",
+      value = function()
+        local index = shared.buildBlacklistIndex() or {}
+        local n = 0
+        for _, entry in ipairs(index) do
+          if shared.blacklistRaw(entry.id) then n = n + 1 end
+        end
+        return string.format("%d HELD", n)
+      end,
+      activate = function(g)
+        local ok, screen = pcall(Screen.new, g)
+        if ok and screen then
+          g.stack:push(screen)
+        else
+          mod.log:warn(
+            "g9_battle_sample: BLACKLIST screen failed to open (%s)",
+            tostring(screen))
+        end
+      end,
+    }
     return result
   end, 0)
 
-  mod.log:info("g9_battle_sample: TRAIN party screen installed (Gen %d)", gen)
+  mod.log:info("g9_battle_sample: BLACKLIST screen installed (Gen %d)", gen)
 end
 
 -- Which arm to install.  GameVersion is the engine's own answer, and the same
@@ -3238,13 +3798,12 @@ return function(mod)
   -- provider, combat-type routing helpers) install first, whatever the
   -- generation -- both arms consume the same `shared` table.
   local shared = installRandomizer(mod, gen)
-  -- The TRAIN party screen is generation-agnostic (one hook, both gens); it
-  -- installs here, before either arm, so its Gen 2 Mon.refreshStats re-apply
-  -- wrap is the outermost one on that module.
-  local okTrain, trainErr = pcall(installTrainScreen, mod, gen, shared)
-  if not okTrain then
-    mod.log:warn("g9_battle_sample: TRAIN screen install failed: %s",
-      tostring(trainErr))
+  -- The BLACKLIST window is generation-agnostic too (one ui.options.rows hook,
+  -- both gens); it reads and writes the blacklist state installRandomizer owns.
+  local okBlack, blackErr = pcall(installBlacklist, mod, gen, shared)
+  if not okBlack then
+    mod.log:warn("g9_battle_sample: BLACKLIST screen install failed: %s",
+      tostring(blackErr))
   end
   if gen == 2 then
     return installGen2(mod, shared)
