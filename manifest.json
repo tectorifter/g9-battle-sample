@@ -1,11 +1,11 @@
 {
   "id": "g9-battle-sample",
   "name": "g9-battle-sample",
-  "version": "1.1.2",
+  "version": "1.4.0",
   "api": 2,
   "entry": "main.lua",
   "profile": "content",
-  "game_version": ">=0.2.45",
+  "game_version": ">=0.1.45",
   "games": [
     "gen1",
     "gen2"
@@ -15,18 +15,14 @@
   "permissions": [
     "engine_internals"
   ],
-  "dependencies": [],
-  "optional_dependencies": [
-    "national_dex",
-    "g9-Battle-Scene",
+  "dependencies": [
     "g9-battle-engine"
   ],
-  "dependency_sources": {
-    "g9-battle-engine": "https://github.com/tectorifter/Gen9Dex",
-    "national_dex": "https://github.com/sanjinpepic/gen1recomp-national-dex",
-    "g9-Battle-Scene": "https://github.com/tectorifter/g9-battle-scenes"
-  },
-  "description": "Multi-utility mods and randomizer.",
+  "optional_dependencies": [
+    "national_dex",
+    "g9-Battle-Scene"
+  ],
+  "description": "Sample mod: routes battles through the g9 engine and scene, with options.",
   "options_schema": "options.lua",
   "experimental": false,
   "github": "https://github.com/tectorifter/g9-battle-sample",

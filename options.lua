@@ -15,10 +15,10 @@
 return {
   {
     key = "battle_scene",
-    label = "BATTLE SCENE",
+    label = "2v2/3v3/4v1",
     type = "toggle",
     default = true,
-    description = "ON (default): wild encounters and trainer battles render through the g9-Battle-Scene mod's custom layouts -- every wild fight takes singles, doubles, triples, hordes or the 0.5% bossFight, and a trainer fight picks doubles, triples or bossFight from the enemy battle that already exists (the Elite Four roll doubles-or-triples, Champion/Red and wild_forms's Eternatus are bossFight, a one-mon team takes the scene's singles screen, everyone else doubles). OFF: the game's own native battle screen runs instead, for Gen 1 and Gen 2 respectively, for EVERY fight -- wild, trainer and rematch alike -- and g9-Battle-Scene is never used, so it can be left disabled or uninstalled.",
+    description = "ON (default): the custom layouts g9-Battle-Scene adds are chosen from the fight -- a wild encounter takes singles, doubles (2v2), triples (3v3), a 1v5 horde or the 0.5% bossFight, and a trainer fight picks doubles, triples or the 4v1 bossFight from the enemy battle that already exists (the Elite Four roll doubles-or-triples, Champion/Red and wild_forms's Eternatus are bossFight, everyone else doubles). OFF: every fight still renders through g9-Battle-Scene, but ALWAYS on its singles layout -- no doubles, triples, hordes or bossFights -- instead of falling back to the game's native screen. To switch the custom scene off entirely (native battles), turn OFF the BACKGROUND row in g9-Battle-Scene's own options.",
   },
   {
     key = "difficulty",
@@ -34,14 +34,48 @@ return {
     label = "RAND WILDS",
     type = "toggle",
     default = true,
-    description = "ON (default): an ordinary wild encounter's species is re-rolled to a random species that shares a type with it and whose base-stat total is within -5% to +(5*level)% of the original's. A WATER encounter (surfing or fishing) only re-rolls into a WATER- or FLYING-type species -- water areas are water-and-flying exclusive -- while a LAND or CAVE encounter bans WATER types (a FLYING type is welcome anywhere). Every randomised species is pushed to the latest evolution its level allows -- a level-up evolution needs its own level, a trade one needs level 40, a STONE evolution appears in the wild only from level 35, and a HELD-ITEM or HAPPINESS evolution appears from level 35 too (or level 25 when the mon evolving is a BABY, e.g. Happiny's Chansey) -- and a legendary is only ever picked at level 45 or higher. A blacklisted species (the BLACKLIST row on the OPTIONS menu) is never picked at all -- MEGA and GIGANTAMAX forms are delisted out of the box, and the window's own [MEGA] [GIGA] row flips either whole group at once. The random LAYOUT bands (hordes/triples/doubles/singles, and the 0.5% bossFight) stay on either way.",
+    description = "ON (default): an ordinary wild encounter's species is re-rolled to a random species that shares a type with it and whose base-stat total is within -5% to +(5*level)% of the original's. A WATER encounter (surfing or fishing) only re-rolls into a WATER- or FLYING-type species -- water areas are water-and-flying exclusive -- while a LAND or CAVE encounter bans WATER types (a FLYING type is welcome anywhere). Every randomised species is pushed to the latest evolution its level allows -- a level-up evolution needs its own level, a trade one needs level 40, a STONE evolution appears in the wild only from level 35, and a HELD-ITEM or HAPPINESS evolution appears from level 35 too (or level 25 when the mon evolving is a BABY, e.g. Happiny's Chansey) -- and a legendary is only ever picked at level 45 or higher. A blacklisted species (the BLACKLIST row on the OPTIONS menu) is never picked at all -- MEGA and GIGANTAMAX forms are delisted out of the box, and the window's own [MEGA] [GIGA] row flips either whole group at once. The random LAYOUT bands (hordes/triples/doubles/singles, and the 0.5% bossFight) stay on either way. In a DOUBLES or TRIPLES wild fight each extra enemy is rolled independently (a horde stays one species), and the two WILD LEVELS settings below apply.",
+  },
+  {
+    key = "wild_levels",
+    label = "WILD LEVELS",
+    type = "choice",
+    default = "off",
+    choices = { { "OFF", "off" }, { "0", "0" }, { "+2", "2" }, { "+4", "4" },
+                { "+6", "6" }, { "+8", "8" }, { "+16", "16" }, { "-2", "-2" },
+                { "-4", "-4" }, { "-6", "-6" }, { "-8", "-8" },
+                { "-16", "-16" } },
+    description = "OFF (default) leaves every wild Pokemon at the level the game rolled it -- vanilla values, with no level difference applied. 0 sets the level to WILD LV ANCHOR exactly, and +2/+4/+6/+8/+16 or -2/-4/-6/-8/-16 add or subtract that much from the anchor. The area's own spawn-level spread is kept on top, so a delta of 0 on a party whose highest is 30 turns a route that rolls 2-4 into 30-32 (not a flat 30), and +16 makes it 46-48. Only read while RAND WILDS is on.",
+  },
+  {
+    key = "wild_anchor",
+    label = "WILD LV ANCHOR",
+    type = "choice",
+    default = "highest",
+    choices = { { "LOWEST", "lowest" }, { "HIGHEST", "highest" },
+                { "AVERAGE", "average" }, { "LEADER", "leader" } },
+    description = "Which party Pokemon's level WILD LEVELS is measured from: LOWEST = the lowest level in your party, HIGHEST (default) = the highest, AVERAGE = the arithmetic mean, LEADER = the first Pokemon in your party. Only read while RAND WILDS is on and WILD LEVELS is not OFF.",
   },
   {
     key = "rand_trainers",
     label = "RAND TRAINER MONS",
     type = "toggle",
     default = true,
-    description = "ON (default): every trainer, gym leader, Elite Four, Champion and rival has each party Pokemon swapped for a random species sharing at least one type and of equivalent BST (within -5% to +(5*level)%). Each swap is pushed to the latest evolution its level allows (trade/item/held-item/friendship evolutions from level 40 -- a trainer's roster keeps the level-40 gate, not the wild's 35/25), a legendary is only ever chosen at level 45 or higher, and a blacklisted species (Mega and Gigantamax forms are delisted by default) is never chosen at all. OFF: trainer teams keep their real species.",
+    description = "ON (default): every trainer, gym leader, Elite Four, Champion and rival has each party Pokemon swapped for a random species sharing at least one type and of equivalent BST (within -5% to +(5*level)%). Each swap is pushed to the latest evolution its level allows (trade/item/held-item/friendship evolutions from level 40 -- a trainer's roster keeps the level-40 gate, not the wild's 35/25), a legendary is only ever chosen at level 45 or higher, and a blacklisted species (Mega and Gigantamax forms are delisted by default) is never chosen at all. A gym leader's, Elite Four member's or gym trainer's swaps also stay on that gym's own type theme (GYM THEMES): Falkner only ever uses FLYING types, Brock only ROCK, and so on. OFF: trainer teams keep their real species.",
+  },
+  {
+    key = "league_aces",
+    label = "LEAGUE ACES",
+    type = "toggle",
+    default = true,
+    -- Only offered while RAND TRAINER MONS is on: the aces ARE the slots the
+    -- randomizer would otherwise overwrite, so the row is meaningless without
+    -- it.  The engine's own `visible_if` schema field is what makes the manager
+    -- show and hide this row LIVE as RAND TRAINER MONS is flipped (flipping a
+    -- row rebuilds the menu), so it APPEARS when the randomizer is switched on
+    -- and disappears again when it is switched off.
+    visible_if = { key = "rand_trainers", equals = true },
+    description = "ON (default): every league trainer -- a gym leader, an Elite Four member, the Champion or Red -- keeps its listed SIGNATURE Pokemon in the FINAL slots of its team, so RAND TRAINER MONS cannot randomize them away. The rest of the team is still randomized and grown by DIFFICULTY as usual, an ace takes the level of the slot it fills, and its nature/IVs/EVs come from DIFFICULTY like any other trainer mon; its moveset and held item are the entry's own (which is how a Mega Stone or a Light Ball reaches battle_forms). OFF: the whole team is randomized like any other trainer's. Only offered while RAND TRAINER MONS is on, and the in-game OPTIONS menu carries the same ON/OFF row (see LEAGUE_ACES.md for the full team table).",
   },
   {
     key = "item_randomizer",
@@ -71,7 +105,7 @@ return {
     label = "REMATCHES",
     type = "toggle",
     default = false,
-    description = "ON: a trainer you have already beaten can be fought again. Press A on them (the ordinary way you would talk to anyone) and they will ask whether you want to battle again: YES starts a rematch, NO carries on with their usual after-battle line, exactly as if you had never asked. It only ever starts on your own press, so a beaten trainer can never re-challenge you by itself as you walk past. Their dialogue, payout and any badge/TM reward stay exactly as they were (a reward is never paid twice), and a trainer whose talk is a hand-ported story scene -- a rival, the Rocket hideout, a gym leader's own line -- is deliberately left alone, so no story flag can be set out of order. Works on both Red/Blue/Yellow and Gold/Silver/Crystal.",
+    description = "ON: a trainer you have already beaten can be fought again. Press A on them (the ordinary way you would talk to anyone) and they will ask whether you want to battle again: YES starts a rematch, NO carries on with their usual after-battle line, exactly as if you had never asked. It only ever starts on your own press, so a beaten trainer can never re-challenge you by itself as you walk past. Their dialogue, payout and any badge/TM reward stay exactly as they were (a reward is never paid twice), and a trainer whose talk is a hand-ported story scene -- a rival, the Rocket hideout, a gym leader's own line -- is deliberately left alone, so no story flag can be set out of order; gym leaders and the Elite Four are re-enabled by the GYM REMATCHES row. Works on both Red/Blue/Yellow and Gold/Silver/Crystal.",
   },
   {
     key = "rebattle_levels",
@@ -81,6 +115,13 @@ return {
     choices = { { "OFF", "off" }, { "+1", "1" }, { "+2", "2" },
                 { "+4", "4" }, { "+8", "8" }, { "+16", "16" } },
     description = "Every rematch (see REMATCHES) puts this many levels on each Pokemon in the trainer's team, cumulatively: the first fight is vanilla, the second is +this, the third +2x this, and so on. Only ever raises a level -- never a level cap or a species change of its own -- and it stacks with the DIFFICULTY team-size floor and with RAND TRAINER MONS. OFF leaves every team at its real level.",
+  },
+  {
+    key = "gym_rematches",
+    label = "GYM REMATCHES",
+    type = "toggle",
+    default = true,
+    description = "ON (default): REMATCHES also covers gym leaders and the Elite Four. Their A press is a hand-ported story script (the badge/TM line, advice text), which plain REMATCHES deliberately leaves alone -- with this ON, a beaten gym leader or Elite Four member asks whether you want to battle again and, on YES, starts the rematch without re-running that script (a badge or TM is never paid twice). A rematch of one keeps its gym's type theme through RAND TRAINER MONS and the DIFFICULTY team floor (see GYM THEMES). OFF: gyms and the Elite Four keep their story talk, exactly as if this were an ordinary NPC. Requires REMATCHES to be on. Only the league is affected; rivals, Rocket and every other story trainer are still left alone.",
   },
   {
     key = "trainer_item_drop",

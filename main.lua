@@ -102,11 +102,14 @@
 -- All of this is gated by this mod's options.lua (DIFFICULTY, RAND WILDS,
 -- RAND TRAINER MONS), read lazily at battle/encounter time so the Mod
 -- Manager changes take effect without a reload.
--- A tenth option, BATTLE SCENE, gates the WHOLE custom-scene layer instead
--- (see its own row in the define() table below): with it OFF every wild
--- encounter and trainer battle goes to the game's own native battle screen,
--- for Gen 1 and Gen 2 respectively, and g9-Battle-Scene is never consulted --
--- which is why it is now an optional dependency rather than a hard one.
+-- Two rows steer the custom-scene layer instead (see the define() table
+-- below).  The sample's own "2v2/3v3/4v1" row picks the LAYOUT: ON keeps the
+-- full wild/trainer routing, OFF forces every fight onto g9-Battle-Scene's
+-- singles screen.  g9-Battle-Scene's own BACKGROUND row is the master switch:
+-- with it OFF no fight is routed to the scene at all -- every wild encounter
+-- and trainer battle goes to the game's own native battle screen, for Gen 1
+-- and Gen 2 respectively, and g9-Battle-Scene is never consulted (which is why
+-- it is an optional dependency rather than a hard one).
 local function installRandomizer(mod, gen)
   local shared = {}
   local unpack = table.unpack or unpack
@@ -134,10 +137,10 @@ local function installRandomizer(mod, gen)
   mod.options:define({
     {
       key = "battle_scene",
-      label = "BATTLE SCENE",
+      label = "2v2/3v3/4v1",
       type = "toggle",
       default = true,
-      description = "ON (default): wild encounters and trainer battles render through the g9-Battle-Scene mod's custom layouts -- every wild fight takes singles, doubles, triples, hordes or the 0.5% bossFight, and a trainer fight picks doubles, triples or bossFight from the enemy battle that already exists (the Elite Four roll doubles-or-triples, Champion/Red and wild_forms's Eternatus are bossFight, a one-mon team takes the scene's singles screen, everyone else doubles). OFF: the game's own native battle screen runs instead, for Gen 1 and Gen 2 respectively, for EVERY fight -- wild, trainer and rematch alike -- and g9-Battle-Scene is never used, so it can be left disabled or uninstalled.",
+      description = "ON (default): the custom layouts g9-Battle-Scene adds are chosen from the fight -- a wild encounter takes singles, doubles (2v2), triples (3v3), a 1v5 horde or the 0.5% bossFight, and a trainer fight picks doubles, triples or the 4v1 bossFight from the enemy battle that already exists (the Elite Four roll doubles-or-triples, Champion/Red and wild_forms's Eternatus are bossFight, everyone else doubles). OFF: every fight still renders through g9-Battle-Scene, but ALWAYS on its singles layout -- no doubles, triples, hordes or bossFights -- instead of falling back to the game's native screen. To switch the custom scene off entirely (native battles), turn OFF the BACKGROUND row in g9-Battle-Scene's own options.",
     },
     {
       key = "difficulty",
@@ -153,14 +156,48 @@ local function installRandomizer(mod, gen)
       label = "RAND WILDS",
       type = "toggle",
       default = true,
-      description = "ON (default): an ordinary wild encounter's species is re-rolled to a random species that shares a type with it and whose base-stat total is within -5% to +(5*level)% of the original's. A WATER encounter (surfing or fishing) only re-rolls into a WATER- or FLYING-type species -- water areas are water-and-flying exclusive -- while a LAND or CAVE encounter bans WATER types (a FLYING type is welcome anywhere). Every randomised species is pushed to the latest evolution its level allows -- a level-up evolution needs its own level, a trade one needs level 40, a STONE evolution appears in the wild only from level 35, and a HELD-ITEM or HAPPINESS evolution appears from level 35 too (or level 25 when the mon evolving is a BABY, e.g. Happiny's Chansey) -- and a legendary is only ever picked at level 45 or higher. A blacklisted species (the BLACKLIST row on the OPTIONS menu) is never picked at all -- MEGA and GIGANTAMAX forms are delisted out of the box, and the window's own [MEGA] [GIGA] row flips either whole group at once. The random LAYOUT bands (hordes/triples/doubles/singles, and the 0.5% bossFight) stay on either way.",
+      description = "ON (default): an ordinary wild encounter's species is re-rolled to a random species that shares a type with it and whose base-stat total is within -5% to +(5*level)% of the original's. A WATER encounter (surfing or fishing) only re-rolls into a WATER- or FLYING-type species -- water areas are water-and-flying exclusive -- while a LAND or CAVE encounter bans WATER types (a FLYING type is welcome anywhere). Every randomised species is pushed to the latest evolution its level allows -- a level-up evolution needs its own level, a trade one needs level 40, a STONE evolution appears in the wild only from level 35, and a HELD-ITEM or HAPPINESS evolution appears from level 35 too (or level 25 when the mon evolving is a BABY, e.g. Happiny's Chansey) -- and a legendary is only ever picked at level 45 or higher. A blacklisted species (the BLACKLIST row on the OPTIONS menu) is never picked at all -- MEGA and GIGANTAMAX forms are delisted out of the box, and the window's own [MEGA] [GIGA] row flips either whole group at once. The random LAYOUT bands (hordes/triples/doubles/singles, and the 0.5% bossFight) stay on either way. In a DOUBLES or TRIPLES wild fight each extra enemy is rolled independently (a horde stays one species), and the two WILD LEVELS settings below apply.",
+    },
+    {
+      key = "wild_levels",
+      label = "WILD LEVELS",
+      type = "choice",
+      default = "off",
+      choices = { { "OFF", "off" }, { "0", "0" }, { "+2", "2" }, { "+4", "4" },
+                  { "+6", "6" }, { "+8", "8" }, { "+16", "16" }, { "-2", "-2" },
+                  { "-4", "-4" }, { "-6", "-6" }, { "-8", "-8" },
+                  { "-16", "-16" } },
+      description = "OFF (default) leaves every wild Pokemon at the level the game rolled it -- vanilla values, with no level difference applied. 0 sets the level to WILD LV ANCHOR exactly, and +2/+4/+6/+8/+16 or -2/-4/-6/-8/-16 add or subtract that much from the anchor. The area's own spawn-level spread is kept on top, so a delta of 0 on a party whose highest is 30 turns a route that rolls 2-4 into 30-32 (not a flat 30), and +16 makes it 46-48. Only read while RAND WILDS is on.",
+    },
+    {
+      key = "wild_anchor",
+      label = "WILD LV ANCHOR",
+      type = "choice",
+      default = "highest",
+      choices = { { "LOWEST", "lowest" }, { "HIGHEST", "highest" },
+                  { "AVERAGE", "average" }, { "LEADER", "leader" } },
+      description = "Which party Pokemon's level WILD LEVELS is measured from: LOWEST = the lowest level in your party, HIGHEST (default) = the highest, AVERAGE = the arithmetic mean, LEADER = the first Pokemon in your party. Only read while RAND WILDS is on and WILD LEVELS is not OFF.",
     },
     {
       key = "rand_trainers",
       label = "RAND TRAINER MONS",
       type = "toggle",
       default = true,
-      description = "ON (default): every trainer, gym leader, Elite Four, Champion and rival has each party Pokemon swapped for a random species sharing at least one type and of equivalent BST (within -5% to +(5*level)%). Each swap is pushed to the latest evolution its level allows (trade/item/held-item/friendship evolutions from level 40 -- a trainer's roster keeps the level-40 gate, not the wild's 35/25), a legendary is only ever chosen at level 45 or higher, and a blacklisted species (Mega and Gigantamax forms are delisted by default) is never chosen at all. OFF: trainer teams keep their real species.",
+      description = "ON (default): every trainer, gym leader, Elite Four, Champion and rival has each party Pokemon swapped for a random species sharing at least one type and of equivalent BST (within -5% to +(5*level)%). Each swap is pushed to the latest evolution its level allows (trade/item/held-item/friendship evolutions from level 40 -- a trainer's roster keeps the level-40 gate, not the wild's 35/25), a legendary is only ever chosen at level 45 or higher, and a blacklisted species (Mega and Gigantamax forms are delisted by default) is never chosen at all. A gym leader's, Elite Four member's or gym trainer's swaps also stay on that gym's own type theme (GYM THEMES): Falkner only ever uses FLYING types, Brock only ROCK, and so on. OFF: trainer teams keep their real species.",
+    },
+    {
+      key = "league_aces",
+      label = "LEAGUE ACES",
+      type = "toggle",
+      default = true,
+      -- Only offered while RAND TRAINER MONS is on: the aces ARE the slots the
+      -- randomizer would otherwise overwrite, so the row is meaningless without
+      -- it.  The engine's own `visible_if` schema field is what makes the
+      -- manager show and hide this row LIVE as RAND TRAINER MONS is flipped
+      -- (flipping a row rebuilds the menu), so it APPEARS when the randomizer
+      -- is switched on and disappears again when it is switched off.
+      visible_if = { key = "rand_trainers", equals = true },
+      description = "ON (default): every league trainer -- a gym leader, an Elite Four member, the Champion or Red -- keeps its listed SIGNATURE Pokemon in the FINAL slots of its team, so RAND TRAINER MONS cannot randomize them away. The rest of the team is still randomized and grown by DIFFICULTY as usual, an ace takes the level of the slot it fills, and its nature/IVs/EVs come from DIFFICULTY like any other trainer mon; its moveset and held item are the entry's own (which is how a Mega Stone or a Light Ball reaches battle_forms). OFF: the whole team is randomized like any other trainer's. Only offered while RAND TRAINER MONS is on, and the in-game OPTIONS menu carries the same ON/OFF row (see LEAGUE_ACES.md for the full team table).",
     },
     {
       key = "item_randomizer",
@@ -190,7 +227,7 @@ local function installRandomizer(mod, gen)
       label = "REMATCHES",
       type = "toggle",
       default = false,
-      description = "ON: a trainer you have already beaten can be fought again. Press A on them (the ordinary way you would talk to anyone) and they will ask whether you want to battle again: YES starts a rematch, NO carries on with their usual after-battle line, exactly as if you had never asked. It only ever starts on your own press, so a beaten trainer can never re-challenge you by itself as you walk past. Their dialogue, payout and any badge/TM reward stay exactly as they were (a reward is never paid twice), and a trainer whose talk is a hand-ported story scene -- a rival, the Rocket hideout, a gym leader's own line -- is deliberately left alone, so no story flag can be set out of order. Works on both Red/Blue/Yellow and Gold/Silver/Crystal.",
+      description = "ON: a trainer you have already beaten can be fought again. Press A on them (the ordinary way you would talk to anyone) and they will ask whether you want to battle again: YES starts a rematch, NO carries on with their usual after-battle line, exactly as if you had never asked. It only ever starts on your own press, so a beaten trainer can never re-challenge you by itself as you walk past. Their dialogue, payout and any badge/TM reward stay exactly as they were (a reward is never paid twice), and a trainer whose talk is a hand-ported story scene -- a rival, the Rocket hideout, a gym leader's own line -- is deliberately left alone, so no story flag can be set out of order; gym leaders and the Elite Four are re-enabled by the GYM REMATCHES row. Works on both Red/Blue/Yellow and Gold/Silver/Crystal.",
     },
     {
       key = "rebattle_levels",
@@ -200,6 +237,13 @@ local function installRandomizer(mod, gen)
       choices = { { "OFF", "off" }, { "+1", "1" }, { "+2", "2" },
                   { "+4", "4" }, { "+8", "8" }, { "+16", "16" } },
       description = "Every rematch (see REMATCHES) puts this many levels on each Pokemon in the trainer's team, cumulatively: the first fight is vanilla, the second is +this, the third +2x this, and so on. Only ever raises a level -- never a level cap or a species change of its own -- and it stacks with the DIFFICULTY team-size floor and with RAND TRAINER MONS. OFF leaves every team at its real level.",
+    },
+    {
+      key = "gym_rematches",
+      label = "GYM REMATCHES",
+      type = "toggle",
+      default = true,
+      description = "ON (default): REMATCHES also covers gym leaders and the Elite Four. Their A press is a hand-ported story script (the badge/TM line, advice text), which plain REMATCHES deliberately leaves alone -- with this ON, a beaten gym leader or Elite Four member asks whether you want to battle again and, on YES, starts the rematch without re-running that script (a badge or TM is never paid twice). A rematch of one keeps its gym's type theme through RAND TRAINER MONS and the DIFFICULTY team floor (see GYM THEMES). OFF: gyms and the Elite Four keep their story talk, exactly as if this were an ordinary NPC. Requires REMATCHES to be on. Only the league is affected; rivals, Rocket and every other story trainer are still left alone.",
     },
     {
       key = "trainer_item_drop",
@@ -222,6 +266,10 @@ local function installRandomizer(mod, gen)
   local function option(key) return mod.options:get(key) end
   local function randWildsOn() return option("rand_wilds") == true end
   local function randTrainersOn() return option("rand_trainers") == true end
+  -- The generation arms (installGen1/installGen2) close over `shared`, not
+  -- this scope, so the wild-multi-roll gate there needs the alias.
+  shared.randWildsOn = randWildsOn
+  shared.randTrainersOn = randTrainersOn
   local function difficulty() 
     local value = option("difficulty")
     if value == "easy" or value == "normal" or value == "hard" or value == "hell" then
@@ -230,18 +278,130 @@ local function installRandomizer(mod, gen)
     return "normal"
   end
 
-  -- BATTLE SCENE -- one switch for the whole custom-scene layer.  ON (the
-  -- default) keeps every wild encounter and trainer battle rendering through
-  -- g9-Battle-Scene; OFF returns to the game's own native battle screen for
-  -- both generations, so g9-Battle-Scene is never consulted (it is an
-  -- optional dependency now).  Read at battle time, so a Mod Manager change
-  -- takes effect without a reload.
-  local function battleSceneOn() return option("battle_scene") ~= false end
+  -- MULTI-MON LAYOUTS -- the Manager's "2v2/3v3/4v1" row (option key
+  -- `battle_scene`, kept for stored-setting compatibility).  ON (the
+  -- default) keeps the full layout routing: a wild encounter rolls
+  -- singles/doubles/triples/hordes plus the 0.5% bossFight, and a trainer
+  -- fight picks doubles/triples/bossFight from the enemy battle that already
+  -- exists.  OFF narrows EVERY fight to g9-Battle-Scene's own "singles"
+  -- layout -- it no longer hands the battle back to the native screen.  Read
+  -- at battle time, so a Mod Manager change takes effect without a reload.
+  local function multiLayoutOn() return option("battle_scene") ~= false end
+
+  -- IS THE CUSTOM SCENE WANTED AT ALL?  g9-Battle-Scene owns the master
+  -- switch now: its own BACKGROUND row set to OFF means "use the game's
+  -- native battle screen, please", and then NO fight is routed to the scene
+  -- (art and layouts alike).  AUTO (the default) or a pinned tag keeps it.
+  -- Read live per fight, and tolerant of an older scene that only exposes the
+  -- raw option (or none at all) -- a missing export means "wanted".
+  local function sceneWanted()
+    local scene = shared.sceneHandle()
+    if not scene then return false end
+    local exports = scene.exports
+    local bg = exports and exports.battleSceneBackground
+    if bg then
+      if type(bg.sceneWanted) == "function" then
+        local ok, wanted = pcall(bg.sceneWanted)
+        if ok then return wanted and true or false end
+      end
+      if type(bg.option) == "function" then
+        local ok, value = pcall(bg.option)
+        if ok and value == "off" then return false end
+      end
+    end
+    return true
+  end
 
   -- Exposed on `shared` (the table the arm chooser at the bottom hands to
   -- installGen1/installGen2) so those separate functions -- which do not close
-  -- over this one's locals -- read the same switch.
-  shared.battleSceneOn = battleSceneOn
+  -- over this one's locals -- read the same switches.
+  shared.multiLayoutOn = multiLayoutOn
+  shared.sceneWanted = sceneWanted
+
+  -- --------------------------------------------------------- gym themes
+  -- 2026-09-10, explicit user request: a gym leader's (and an Elite Four's)
+  -- randomized AND difficulty-added team must stay on that gym's own type
+  -- theme -- "Falkner is flying type, he can only use flying types, same for
+  -- elite fours".  This table IS that config: one trainer-class id -> the
+  -- type(s) allowed for it.  A value may be a single type or a list (a gym's
+  -- main type plus any acceptable sub-types); a species is allowed when AT
+  -- LEAST ONE of its own types is named here, so a Normal/Flying Pidgey is
+  -- legal for Falkner (its FLYING half) exactly as a mono-Flying mon is.
+  -- Class ids are per generation and disjoint (Gen 1 spells Kanto's OPP_*),
+  -- so one table answers for both.  A mixed-type trainer (BLUE) has no theme
+  -- and is deliberately absent.
+  local GYM_THEMES = {
+    -- Kanto gyms
+    OPP_BROCK = "ROCK", OPP_MISTY = "WATER", OPP_LT_SURGE = "ELECTRIC",
+    OPP_ERIKA = "GRASS", OPP_KOGA = "POISON", OPP_SABRINA = "PSYCHIC",
+    OPP_BLAINE = "FIRE", OPP_GIOVANNI = "GROUND",
+    -- Kanto Elite Four (Gen 1)
+    OPP_LORELEI = "ICE", OPP_BRUNO = "FIGHTING", OPP_AGATHA = "GHOST",
+    OPP_LANCE = "DRAGON",
+    -- Johto gyms (Gen 2)
+    FALKNER = "FLYING", BUGSY = "BUG", WHITNEY = "NORMAL", MORTY = "GHOST",
+    CHUCK = "FIGHTING", JASMINE = "STEEL", PRYCE = "ICE", CLAIR = "DRAGON",
+    -- Johto Elite Four (Gen 2)
+    WILL = "PSYCHIC", KOGA = "POISON", BRUNO = "FIGHTING", KAREN = "DARK",
+    -- Kanto gyms (Gen 2 post-game); Blue is mixed, so no theme row for him.
+    BROCK = "ROCK", MISTY = "WATER", LT_SURGE = "ELECTRIC", ERIKA = "GRASS",
+    JANINE = "POISON", SABRINA = "PSYCHIC", BLAINE = "FIRE",
+  }
+
+  -- Every league trainer the GYM REMATCHES switch knows about -- a gym leader
+  -- or Elite Four member (Blue included, even though he has no theme).  Their
+  -- A press is a hand-ported story script (badge/TM retry, advice line), so
+  -- plain REMATCHES deliberately leaves them alone; this set is what the
+  -- dedicated switch looks up.
+  local GYM_CLASSES = {
+    OPP_BROCK = true, OPP_MISTY = true, OPP_LT_SURGE = true, OPP_ERIKA = true,
+    OPP_KOGA = true, OPP_SABRINA = true, OPP_BLAINE = true, OPP_GIOVANNI = true,
+    OPP_LORELEI = true, OPP_BRUNO = true, OPP_AGATHA = true, OPP_LANCE = true,
+    FALKNER = true, BUGSY = true, WHITNEY = true, MORTY = true, CHUCK = true,
+    JASMINE = true, PRYCE = true, CLAIR = true,
+    WILL = true, KOGA = true, BRUNO = true, KAREN = true,
+    BROCK = true, MISTY = true, LT_SURGE = true, ERIKA = true, JANINE = true,
+    SABRINA = true, BLAINE = true, BLUE = true,
+  }
+
+  -- A class id -> a { [TYPE] = true } set, or nil when the trainer has no
+  -- theme (a non-league trainer, or mixed-type Blue).
+  local function themeSetOf(classId)
+    local theme = type(classId) == "string" and GYM_THEMES[classId] or nil
+    if theme == nil then return nil end
+    local set = {}
+    if type(theme) == "table" then
+      for _, t in ipairs(theme) do
+        if type(t) == "string" then set[t:upper()] = true end
+      end
+    else
+      set[tostring(theme):upper()] = true
+    end
+    return set
+  end
+  function shared.themeTypesFor(classId) return themeSetOf(classId) end
+  function shared.isGymClass(classId)
+    return type(classId) == "string" and GYM_CLASSES[classId] == true
+  end
+
+  -- The class id off whichever generation's object this is.  Gen 1 keeps the
+  -- class NAME on def.trainerClass.  Gen 2 keeps the class's NUMERIC constant
+  -- on the extracted def.trainer struct (`class`), while every table above --
+  -- GYM_CLASSES, GYM_THEMES, E4_CLASSES -- keys on the name, so the number is
+  -- resolved through the cache's own class index.  (Before that resolve this
+  -- returned the raw byte, so on Gold/Silver/Crystal `isGymClass` was false
+  -- for every leader and the type themes never matched.)  `record.classId` is
+  -- honored first for a caller that has already resolved it.
+  function shared.trainerClassOf(npcOrDef)
+    local d = npcOrDef and (npcOrDef.def or npcOrDef)
+    if type(d) ~= "table" then return nil end
+    if d.trainerClass ~= nil then return d.trainerClass end
+    local record = type(d.trainer) == "table" and d.trainer or nil
+    if record == nil then return nil end
+    if record.classId ~= nil then return record.classId end
+    if shared.gen2ClassName then return shared.gen2ClassName(record.class) end
+    return record.class
+  end
 
   -- ----------------------------------------------------- reaching the scene
   -- The scene's manifest id is `g9-Battle-Scene`, but a fork or re-release
@@ -263,7 +423,7 @@ local function installRandomizer(mod, gen)
   end
 
   -- ------------------------------------------------- silent-failure reporting
-  -- BATTLE SCENE is ON but the scene cannot be reached (not installed,
+  -- The battle scene is on but the scene cannot be reached (not installed,
   -- disabled, or failed to load) -- the ONE failure mode that otherwise looks
   -- exactly like "the custom screens simply don't work", with no reason
   -- visible on a build where the player cannot read the log.  Reported ONCE
@@ -298,7 +458,8 @@ local function installRandomizer(mod, gen)
 
   -- Run `fn` with g9-Battle-Scene's own layout-push exports hidden, then put
   -- them back (the same swap-and-restore this file already uses for a
-  -- randomized item id).  BATTLE SCENE OFF has to beat EVERY route to the
+  -- randomized item id).  THE CUSTOM SCENE OFF (g9-Battle-Scene's BACKGROUND
+  -- row) has to beat EVERY route to the
   -- scene -- including another mod's registered trainer: g9-battle-engine's
   -- own registerTrainer wrap (the Gen 2 arm's captured native startBattle)
   -- pushes a doubles/triples layout on its own whenever it finds
@@ -322,13 +483,53 @@ local function installRandomizer(mod, gen)
 
   -- ------------------------------------------------------------- live data
   -- require("src.core.Game") is the Gen2Compat-provided facade, so .data
-  -- resolves against whichever game is actually running (same helper the
-  -- engine's own install_gym_trainer_teams.lua uses).
+  -- resolves against whichever game is actually running (the same facade the
+  -- engine's own overworld/pokecenter_heal.lua uses).
   local function liveData()
     local ok, Game = pcall(require, "src.core.Game")
     if ok and type(Game) == "table" then return Game.data end
     return nil
   end
+
+  -- The live save, same facade.  Declared here (with liveData) rather than
+  -- next to the beaten-trainer helpers, because the wild-level settings below
+  -- read the party anchor off it and their helpers must be lexically visible
+  -- to the encounter hooks further up the file.
+  local function liveSave()
+    local ok, Game = pcall(require, "src.core.Game")
+    if ok and type(Game) == "table" then return Game.save end
+    return nil
+  end
+
+  -- ------------------------------------------------- Gen 2 trainer classes
+  -- A Gen 2 trainer struct -- and `loadtrainer --class, member` -- carries the
+  -- class's NUMERIC constant (Trainers.lookup's `class`), while GYM_THEMES /
+  -- GYM_CLASSES / E4_CLASSES key on the class NAME (Trainers.lookup's
+  -- `classId`).  The cache's trainer table carries the pair, so index it once
+  -- and hand the name back.  Nil when the cache's trainers table is not loaded
+  -- yet, which is exactly right: the caller then falls back to the raw value
+  -- rather than inventing a class.
+  local gen2ClassIndex
+  function shared.gen2ClassName(class)
+    if type(class) ~= "number" then return class end
+    local data = liveData()
+    local classes = data and data.trainers and data.trainers.classes
+    if type(classes) ~= "table" then return nil end
+    if gen2ClassIndex == nil then
+      gen2ClassIndex = {}
+      for id, entry in pairs(classes) do
+        if type(entry) == "table" and type(entry.index) == "number" then
+          gen2ClassIndex[entry.index] = entry.id or id
+        end
+      end
+    end
+    return gen2ClassIndex[class]
+  end
+  -- Both are handed to the two generation arms (which are defined OUTSIDE this
+  -- closure and receive nothing but `shared`), the same way every other
+  -- predicate an arm calls is.
+  shared.liveSave = liveSave
+  shared.liveData = liveData
 
   -- ---------------------------------------------------------- species pool
   -- data.pokemon is the merged content registry (the cart's own species
@@ -815,6 +1016,22 @@ local function installRandomizer(mod, gen)
   local function isWaterTyped(entry) return hasType(entry, "WATER") end
   local function isFlyingTyped(entry) return hasType(entry, "FLYING") end
 
+  -- True when a pool entry carries ANY of the types in a gym theme set --
+  -- the gym-leader rule (see GYM_THEMES).  A nil set means "no theme", i.e.
+  -- every species is allowed, which is what a non-league trainer gets.
+  local function carriesTheme(entry, themeSet)
+    if not themeSet then return true end
+    local types = type(entry) == "table" and entry.types
+    if type(types) ~= "table" then return false end
+    for _, t in ipairs(types) do
+      if type(t) == "string" then
+        local u = t:upper():gsub("_TYPE$", "")
+        if themeSet[u] then return true end
+      end
+    end
+    return false
+  end
+
   -- ----------------------------------------------------- evolutions by level
   -- 2026-09-14, explicit user request: "if Level allows it, we always evolve
   -- pokemon to latest available evolution, trade evolutions are available for
@@ -1040,12 +1257,16 @@ local function installRandomizer(mod, gen)
     local data = opts.data or liveData()
     local terrain = opts.terrain or (opts.aquatic and "water") or "any"
     local wild = opts.wild == true
+    -- A gym theme (see GYM_THEMES): when set, a candidate -- and the form its
+    -- evolution walk lands on -- must carry at least one of the theme's types.
+    local theme = type(opts.types) == "table" and opts.types or nil
     local gates = buildEvoGates(data)
     local low = orig.bst * 0.95
     local high = orig.bst * (1 + 5 * lvl / 100)
     local function gateOf(id) return wild and gates[id] or nil end
     local function allowed(e)
       if isBlacklisted(e.id) then return false end
+      if theme and not carriesTheme(e, theme) then return false end
       -- A stone / held-item / happiness evolution only shows up in the wild
       -- from its own gate (35, or 25 for a baby line).
       local gate = gateOf(e.id)
@@ -1074,9 +1295,10 @@ local function installRandomizer(mod, gen)
     local base = candidates[love.math.random(1, #candidates)]
     local evolved = latestEvolution(data, base, lvl, wild)
     -- The evolution walk can land on a species the terrain (or the blacklist,
-    -- or an evolution gate) forbids; leave the original alone rather than
-    -- produce an illegal mon.
+    -- an evolution gate, or the gym theme) forbids; leave the original alone
+    -- rather than produce an illegal mon.
     if isBlacklisted(evolved) then return nil end
+    if theme and not carriesTheme(pool[evolved], theme) then return nil end
     local gate = gateOf(evolved)
     if gate and lvl < gate then return nil end
     if terrain == "water" then
@@ -1190,9 +1412,9 @@ local function installRandomizer(mod, gen)
 
   -- One provider serves both generations (the engine's own design): Gen 1
   -- calls it from a BattleState.newTrainer wrap, Gen 2 from its
-  -- battle.started listener.  Priority 100 deliberately outranks the
-  -- engine's own gym_trainer_teams provider (priority 50) so the DIFFICULTY
-  -- setting governs every trainer, including the 22 roster-replaced ones.
+  -- battle.started listener.  Priority 100 deliberately outranks every
+  -- default-priority provider, so the DIFFICULTY setting governs every
+  -- trainer the engine's stats chain is asked about.
   local function trainerStatsProvider(ctx)
     if type(ctx) ~= "table" then return nil end
     local data = ctx.data or (ctx.game and ctx.game.data) or liveData()
@@ -1251,17 +1473,18 @@ local function installRandomizer(mod, gen)
   -- Returns the SAME array when nothing changed, so a battle with the
   -- randomizer off (or nothing eligible) keeps exact object identity for the
   -- engine's own Mon.refreshStats/stat passes.
-  function shared.randomizeParty(party, data)
+  function shared.randomizeParty(party, data, theme)
     if type(party) ~= "table" then return party end
     if not randTrainersOn() then return party end
     data = data or liveData()
     if not buildPool(data) then return party end
+    local opts = theme and { types = theme } or nil
     local out, changed = {}, false
     for i = 1, #party do
       local entry = party[i]
       if type(entry) == "table" and type(entry.species) == "string"
           and not entry.__g9sampleRand then
-        local newId = pickSpecies(entry.species, entry.level)
+        local newId = pickSpecies(entry.species, entry.level, opts)
         if newId then
           if type(entry.stats) == "table" or type(entry.dvs) == "table" then
             local rebuilt = rebuildGen2Mon(data, newId, entry)
@@ -1324,12 +1547,13 @@ local function installRandomizer(mod, gen)
   -- through the running game's own constructor; the plain
   -- {species, level, moves?} ROWS Gen 1's party builder feeds the hook get a
   -- row back.  Returns nil when nothing can be built.
-  local function buildExtraMember(data, template, party)
+  local function buildExtraMember(data, template, party, theme)
     if type(template) ~= "table" then return nil end
     local level = teamLevel(template, party)
     local newId = template.species
     if randTrainersOn() and buildPool(data) then
-      newId = pickSpecies(template.species, level) or template.species
+      newId = pickSpecies(template.species, level,
+        theme and { types = theme } or nil) or template.species
     end
     if type(newId) ~= "string" then return nil end
     if type(template.stats) == "table" or type(template.dvs) == "table" then
@@ -1364,7 +1588,7 @@ local function installRandomizer(mod, gen)
   -- Pad a trainer party up to the difficulty floor.  Returns the SAME array
   -- when it already qualifies -- identity preserved for the engine's own
   -- stat passes -- and a fresh one otherwise.
-  function shared.padTrainerParty(party, data)
+  function shared.padTrainerParty(party, data, theme)
     if type(party) ~= "table" or #party == 0 then return party end
     local want = minTeamSize()
     if want <= #party then return party end
@@ -1373,7 +1597,7 @@ local function installRandomizer(mod, gen)
     for i = 1, #party do out[i] = party[i] end
     while #out < want do
       local template = party[love.math.random(1, #party)]
-      local mon = buildExtraMember(data, template, party)
+      local mon = buildExtraMember(data, template, party, theme)
       if not mon then break end
       out[#out + 1] = mon
     end
@@ -1381,6 +1605,218 @@ local function installRandomizer(mod, gen)
     return out
   end
   shared.minTeamSize = minTeamSize
+  -- The two live-facade readers the LEAGUE ACES installer (a separate
+  -- top-level function, so this one's own local budget stays untouched)
+  -- needs: it builds its mon/rows off the running game's data and reads the
+  -- player's starter off the save.
+  shared.liveData = liveData
+  shared.liveSave = liveSave
+
+  -- ------------------------------------------------- wild level settings
+  -- 2026-09-10, explicit user request (both a no-op unless RAND WILDS is on):
+  --   [WILD LEVELS]    OFF/0/+2/+4/+6/+8/+16/-2/-4/-6/-8/-16 -- OFF keeps the
+  --                    vanilla level; a number rebases the level onto the
+  --                    anchor (0 = exactly the anchor, +/-N = anchor+N).
+  --   [WILD LV ANCHOR] LOWEST/HIGHEST/AVERAGE/LEADER -- which party mon's
+  --                    level the value is measured from.
+  -- A wild mon's level becomes (anchor + delta) + the area's own natural
+  -- spread, so a delta of 16 on a party whose highest is 30 makes the area
+  -- 46-48 and a delta of 0 on the same party makes a 2-4 route read 30-32,
+  -- rather than flattening every roll to one number.
+  --
+  -- 2026-09-10 (1.2.1), explicit user request: before this there was no OFF
+  -- and a 0 delta was the no-op, so "0" silently did nothing.  Now OFF is the
+  -- only no-op and 0 really rebases onto the anchor.
+  local WILD_LEVEL_DELTAS = {
+    ["0"] = 0, ["2"] = 2, ["4"] = 4, ["6"] = 6, ["8"] = 8, ["16"] = 16,
+    ["-2"] = -2, ["-4"] = -4, ["-6"] = -6, ["-8"] = -8, ["-16"] = -16,
+  }
+
+  -- nil means OFF (leave the vanilla roll alone); a number is the delta.
+  local function wildLevelsDelta()
+    local v = option("wild_levels")
+    if v == nil then return nil end
+    if type(v) == "string" then
+      local key = v:lower()
+      if key == "off" then return nil end
+      local n = WILD_LEVEL_DELTAS[key]
+      if n then return n end
+    end
+    local n = tonumber(v)
+    if n then return n end
+    return nil
+  end
+
+  local function clampWildLevel(level)
+    level = math.floor((tonumber(level) or 1) + 0.5)
+    if level < 1 then level = 1 end
+    if level > 100 then level = 100 end
+    return level
+  end
+
+  -- The party's anchor level, by the chosen mode; nil when no party mon has a
+  -- numeric level (or the party is empty).
+  local function partyAnchorLevel(mode)
+    local save = liveSave()
+    local party = save and save.party
+    if type(party) ~= "table" or #party == 0 then return nil end
+    mode = type(mode) == "string" and mode or "highest"
+    if mode == "leader" then
+      local lead = party[1]
+      return lead and tonumber(lead.level) or nil
+    end
+    local min, max, sum, n
+    for i = 1, #party do
+      local l = party[i] and tonumber(party[i].level)
+      if l then
+        if not min or l < min then min = l end
+        if not max or l > max then max = l end
+        sum = (sum or 0) + l
+        n = (n or 0) + 1
+      end
+    end
+    if not n then return nil end
+    if mode == "lowest" then return min end
+    if mode == "average" then return math.floor(sum / n + 0.5) end
+    return max
+  end
+
+  -- The last real roll's own spawn-level window (min/max across the area's
+  -- slots) and terrain, stashed here by the encounter.roll wrap.  Module
+  -- state, not fields on the roll -- Gen 2 builds a real Mon from the roll
+  -- before the wild path ever sees it, so anything hung on the roll table is
+  -- lost by then.  The wild path runs synchronously right after the roll, so
+  -- the stash is always the roll that produced the fight.
+  local lastAreaMin, lastAreaMax = nil, nil
+  local lastWildTerrain = "land"
+  local lastWildBanned = false
+  -- The last real roll's own VANILLA spawn level, before WILD LEVELS rebases
+  -- it.  The SPECIES pick (the BST band, the evolution walk and the
+  -- stone/held-item gates) reads this, never the rebased fight level --
+  -- explicit user rule (2026-09-10): "if level allows it evolve the pokemon
+  -- (must) -- that level refers to the base (vanilla) spawn table not the set
+  -- by dynamic growth of [wild levels]".  WILD LEVELS changes what level the
+  -- fight happens at; it must not push the species further up its evolution
+  -- line (or widen its band) than its own spawn-table level allows.
+  local lastWildVanillaLevel = 1
+
+  -- Ruins of Alph underground (the Unown spawn area) is NEVER randomised.
+  -- Explicit user request (2026-09-12), and an unconditional ban: there is
+  -- deliberately no option to turn it off.  The four item chambers and the
+  -- Inner Chamber are the underground, and their own wild table is UNOWN and
+  -- nothing else -- a randomised step there would overwrite the one species
+  -- the area exists to spawn.  RUINS_OF_ALPH_OUTSIDE (Natu / Smeargle /
+  -- Wooper) is an ordinary outdoor area and stays randomised, which is why
+  -- the match is the RUINS_OF_ALPH_*CHAMBER shape and not the bare
+  -- RUINS_OF_ALPH prefix.  Matching is case-insensitive on the map id.
+  local function ruinsUnderground(mapId)
+    if type(mapId) ~= "string" then return false end
+    return mapId:upper():match("^RUINS_OF_ALPH_.*CHAMBER$") ~= nil
+  end
+
+  -- finalLevel, base, spread.  nil when the settings are off or inapplicable.
+  -- `rolledLevel` lets the caller keep the rolled mon's own position inside
+  -- the area's spread; a nil `rolledLevel` asks only for the base.
+  local function wildLevelPlan(rolledLevel)
+    if not randWildsOn() then return nil end
+    local delta = wildLevelsDelta()
+    if delta == nil then return nil end
+    local anchor = partyAnchorLevel(option("wild_anchor"))
+    if not anchor then return nil end
+    local base = anchor + delta
+    local spread = 0
+    if type(lastAreaMin) == "number" and type(lastAreaMax) == "number"
+        and lastAreaMax > lastAreaMin then
+      spread = lastAreaMax - lastAreaMin
+    end
+    local variance = 0
+    if type(rolledLevel) == "number" and type(lastAreaMin) == "number"
+        and rolledLevel > lastAreaMin then
+      variance = math.min(rolledLevel - lastAreaMin, spread)
+    end
+    return clampWildLevel(base + variance), base, spread
+  end
+
+  -- An INDEPENDENT roll for one extra enemy slot of a doubles/triples wild
+  -- fight: its own species pick (same terrain rule as the base roll) and its
+  -- own level inside the area's spread.  Returns nil when there is nothing to
+  -- roll, and the caller then clones the base roll exactly as before.
+  function shared.wildSlotSpecies(enc, level)
+    if not randWildsOn() or lastWildBanned then return nil end
+    local base = type(enc) == "table" and enc.species or nil
+    if type(base) ~= "string" then return nil end
+    local data = liveData()
+    if not buildPool(data) then return nil end
+    -- The extra slot's species pick reads the base roll's VANILLA level (same
+    -- rule as the base pick -- see lastWildVanillaLevel); the `level` handed
+    -- in is only the slot's FIGHT level (the rebased one).
+    return pickSpecies(base, lastWildVanillaLevel,
+      { terrain = lastWildTerrain, data = data, wild = true })
+  end
+
+  function shared.wildSlotLevel()
+    if not randWildsOn() or lastWildBanned then return nil end
+    local _, base, spread = wildLevelPlan(nil)
+    if not base then return nil end
+    local variance = 0
+    if spread and spread > 0 then variance = love.math.random(0, spread) end
+    return clampWildLevel(base + variance)
+  end
+
+  -- One real roll -> stash the area's spawn-level window.  Handles both
+  -- generations' table shapes: Gen 2 is encDef.grass[mapId].slots[DAY/NITE],
+  -- Gen 1 is encDef.grass.slots.
+  local function levelWindow(list, mn, mx)
+    for _, slot in ipairs(type(list) == "table" and list or {}) do
+      local l = type(slot) == "table" and tonumber(slot.level)
+      if l then
+        if not mn or l < mn then mn = l end
+        if not mx or l > mx then mx = l end
+      end
+    end
+    return mn, mx
+  end
+
+  local function areaLevelWindow(encDef, ctx)
+    if type(encDef) ~= "table" or type(ctx) ~= "table" then return nil, nil end
+    local terrain = type(ctx.terrain) == "string" and ctx.terrain:lower() or "grass"
+    local wantWater = (terrain == "water" or terrain == "ocean")
+    local mapId = ctx.mapId
+    local mn, mx
+    if mapId then
+      local grass = encDef.grass and encDef.grass[mapId]
+      if grass and grass.slots and not wantWater then
+        local key = (ctx.daytime == "DARK") and "NITE" or (ctx.daytime or "DAY")
+        mn, mx = levelWindow(grass.slots[key] or grass.slots.DAY, mn, mx)
+      end
+      local water = encDef.water and encDef.water[mapId]
+      if water and water.slots and (wantWater or not mn) then
+        mn, mx = levelWindow(water.slots, mn, mx)
+      end
+    end
+    if not mn and encDef.grass and encDef.grass.slots and not wantWater then
+      mn, mx = levelWindow(encDef.grass.slots, mn, mx)
+    end
+    if encDef.water and encDef.water.slots and (wantWater or not mn) then
+      mn, mx = levelWindow(encDef.water.slots, mn, mx)
+    end
+    return mn, mx
+  end
+
+  mod.hooks:wrap("encounter.roll", function(nextFn, encDef, ctx)
+    local enc = nextFn(encDef, ctx)
+    if type(ctx) == "table" then
+      -- The Ruins of Alph underground ban, read from the map the roll came
+      -- from.  Kept as module state so the doubles/triples slot rolls below
+      -- (which run after this, off the same encounter) can see it too.
+      lastWildBanned = ruinsUnderground(ctx.mapId)
+      local mn, mx = areaLevelWindow(encDef, ctx)
+      if mn then lastAreaMin, lastAreaMax = mn, mx end
+    else
+      lastWildBanned = false
+    end
+    return enc
+  end, 0)
 
   -- The wild species swap.  `terrainClass(ctx)` is the whole terrain rule on
   -- BOTH games -- Gen 1's rollEncounter passes "grass"/"water"/"indoor", Gen 2
@@ -1389,14 +1825,31 @@ local function installRandomizer(mod, gen)
   -- land here.
   mod.hooks:wrap("encounter.species", function(nextFn, enc, ctx)
     local rolled = nextFn(enc, ctx)
-    if not randWildsOn() then return rolled end
+    -- Ruins of Alph underground: an unconditional ban, checked before
+    -- anything else, so the roll is handed on exactly as vanilla -- species
+    -- and level untouched.  (The roll hook above already set the flag for
+    -- this encounter; this also covers a caller that reached the species
+    -- hook without it.)
+    lastWildBanned = ruinsUnderground(ctx and ctx.mapId)
+    if lastWildBanned or not randWildsOn() then return rolled end
     if type(rolled) ~= "table" or type(rolled.species) ~= "string" then
       return rolled
     end
     local data = (ctx and ctx.data) or liveData()
+    local terrain = terrainClass(ctx)
+    lastWildTerrain = terrain
+    -- The SPECIES pick reads the VANILLA rolled level -- its BST band, its
+    -- evolution walk and its stone/held-item gates all key off the spawn
+    -- table's own level.  Explicit user rule (2026-09-10): "[a wild mon]
+    -- evolves if its level allows it -- that level is the base (vanilla)
+    -- spawn table, not the [WILD LEVELS] one".  WILD LEVELS is applied AFTER,
+    -- and only changes the level the fight happens at.
+    lastWildVanillaLevel = tonumber(rolled.level) or 1
+    local planLevel = wildLevelPlan(rolled.level)
+    if planLevel then rolled.level = planLevel end
     if buildPool(data) then
-      local newId = pickSpecies(rolled.species, rolled.level,
-        { terrain = terrainClass(ctx), data = data, wild = true })
+      local newId = pickSpecies(rolled.species, lastWildVanillaLevel,
+        { terrain = terrain, data = data, wild = true })
       if newId then rolled.species = newId end
     end
     return rolled
@@ -1412,11 +1865,25 @@ local function installRandomizer(mod, gen)
   mod.hooks:wrap("encounter.fishing", function(nextFn, rod, mapId, candidates,
                                                  ctx)
     local enc = nextFn(rod, mapId, candidates, ctx)
+    -- Ruins of Alph underground ban (see the wild hooks above): no fished
+    -- roll is randomised there either.  The area has no water, so this is
+    -- belt-and-braces rather than a live path, but it keeps the ban whole.
+    if ruinsUnderground(mapId) or (ctx and ruinsUnderground(ctx.mapId)) then
+      lastWildBanned = true
+      return enc
+    end
+    lastWildBanned = false
     if not randWildsOn() then return enc end
     if type(enc) ~= "table" or type(enc.species) ~= "string" then return enc end
     local data = (ctx and ctx.data) or liveData()
+    lastWildTerrain = "water"
+    -- Same rule as the grass roll above: the species pick reads the VANILLA
+    -- level; WILD LEVELS only changes the fight's level afterwards.
+    lastWildVanillaLevel = tonumber(enc.level) or 1
+    local planLevel = wildLevelPlan(enc.level)
+    if planLevel then enc.level = planLevel end
     if buildPool(data) then
-      local newId = pickSpecies(enc.species, enc.level,
+      local newId = pickSpecies(enc.species, lastWildVanillaLevel,
         { terrain = "water", data = data, wild = true })
       if newId then enc.species = newId end
     end
@@ -1425,16 +1892,25 @@ local function installRandomizer(mod, gen)
 
   mod.hooks:wrap("trainer.party", function(nextFn, classId, memberId, party)
     local result = nextFn(classId, memberId, party)
+    -- A gym leader / Elite Four keeps their own type theme through BOTH the
+    -- difficulty team floor and the species swap (GYM_THEMES); every other
+    -- trainer gets no theme.
+    local theme = shared.themeTypesFor(classId)
     -- Difficulty team floor first, then the cumulative rematch levels (Gen 1
     -- only -- on Gen 2 the bonus is applied once, in the arm's own
     -- World:startBattle wrap, because this hook runs a second time inside the
     -- scene's own model build there), then the species swap (added mons are
     -- tagged, so the swap leaves them exactly as built).
-    result = shared.padTrainerParty(result)
+    result = shared.padTrainerParty(result, nil, theme)
     if gameGen == 1 then
       result = shared.scaleGen1RematchLevels(classId, memberId, result)
     end
-    return shared.randomizeParty(result)
+    result = shared.randomizeParty(result, nil, theme)
+    -- LEAGUE ACES last: the listed ace Pokemon take over the FINAL slots and
+    -- are exempt from the randomizer that just ran over the rest (see
+    -- installLeagueAces).  Returns the same array when the row is OFF, the
+    -- class is not a league trainer, or the party already carries an ace.
+    return shared.applyLeagueAces(result, classId, memberId)
   end, 0)
 
   -- ------------------------------------------------- combat-type routing
@@ -1544,10 +2020,12 @@ local function installRandomizer(mod, gen)
   local function itemRandomizerOn() return option("item_randomizer") == true end
   local function itemRespawnOn() return option("item_respawn") == true end
   local function rematchesOn() return option("rebattles") == true end
+  local function gymRematchesOn() return option("gym_rematches") == true end
   local function trainerDropOn() return option("trainer_item_drop") == true end
   shared.itemRandomizerOn = itemRandomizerOn
   shared.itemRespawnOn = itemRespawnOn
   shared.rematchesOn = rematchesOn
+  shared.gymRematchesOn = gymRematchesOn
   shared.trainerDropOn = trainerDropOn
 
   -- How often a beaten trainer actually pays out the drop, as a 0..1
@@ -1585,14 +2063,6 @@ local function installRandomizer(mod, gen)
   shared.rematchStep = rematchStep
   shared.rematchTracking = rematchTracking
   shared.respawnInterval = respawnInterval
-
-  -- The live save, through the same Gen2Compat-backed require liveData uses,
-  -- so .save resolves against whichever game is actually running.
-  local function liveSave()
-    local ok, Game = pcall(require, "src.core.Game")
-    if ok and type(Game) == "table" then return Game.save end
-    return nil
-  end
 
   -- The player roster handed to the scene: the first `count` LIVING party mons
   -- in party order.  2026-09-12, explicit user report: a fainted mon at slot
@@ -1721,6 +2191,45 @@ local function installRandomizer(mod, gen)
     return false
   end
 
+  -- ----------------------------------------------------------- banned items
+  -- Items the RANDOMIZER must never hand out -- an explicit user ban
+  -- (2026-09-10), independent of the key-item test above: none of these is a
+  -- key item in the engine's own table on either generation (the battle_forms
+  -- stone / crystal / key-item registrations carry no `keyItem` flag), which
+  -- is exactly why the pool used to be able to draw one.  Four rules cover
+  -- the whole list the user named:
+  --   * every HM -- the record's own `machine.kind == "HM"`, with the id
+  --     spellings as a fallback ("HM_CUT" on Gen 1, "HM01"/"HM_01" elsewhere);
+  --   * every Mega Stone -- every one the engine carries has "ITE" in its id
+  --     (ABOMASITE, CHARIZARDITE_X, MEOWSTICITE_MALE, TATSUGIRIITE_CURLY,
+  --     GARCHOMPITE_Z, ...), so a substring test covers every suffix variant;
+  --     national_dex's own 530-item table has exactly two non-Mega items that
+  --     also contain "ITE" -- EVIOLITE and WHITE_HERB -- and both are excluded;
+  --   * every Z-Crystal -- an id ending in "_Z" (GRASSIUM_Z and the other
+  --     seventeen type crystals; a Mega Stone's own "_Z" is caught above);
+  --   * the four trainer key items by name -- KEY_STONE, DYNAMAX_BAND,
+  --     Z_RING and TERA_ORB.
+  -- A plain evolution stone (FIRE_STONE, OVAL_STONE, ...) is NOT a Mega Stone
+  -- and stays in the pool.
+  local BANNED_ITEM_IDS = {
+    KEY_STONE = true, DYNAMAX_BAND = true, Z_RING = true, TERA_ORB = true,
+  }
+  function shared.isBannedItemId(id, rec)
+    if type(id) ~= "string" then return false end
+    local up = id:upper()
+    if BANNED_ITEM_IDS[up] then return true end
+    if type(rec) == "table" and type(rec.machine) == "table"
+        and rec.machine.kind == "HM" then
+      return true
+    end
+    if up:match("^HM_") or up:match("^HM%d") then return true end
+    if up:match("ITE") and up ~= "EVIOLITE" and not up:match("^WHITE") then
+      return true
+    end
+    if up:match("_Z$") then return true end
+    return false
+  end
+
   -- ------------------------------------------------- item id vs item index
   -- Gen 2 hands the two item-holding seams a NUMERIC operand, not a name.  An
   -- item ball's operand is the raw ROM byte (the extractor keeps the pair as
@@ -1771,11 +2280,11 @@ local function installRandomizer(mod, gen)
   end
 
   -- ------------------------------------------------------- the item pool
-  -- Every real, non-key item the game knows about, as one cached list.  TMs
-  -- and HMs are deliberately IN the pool: the user asked for non-key items,
-  -- and no HM is ever placed in an item ball or a hidden spot (HMs in both
-  -- generations come from scripted gifts), so drawing one cannot soft-lock a
-  -- run.  Built once, then cached -- the item table does not change at
+  -- Every real, non-key, non-banned item the game knows about, as one cached
+  -- list.  TMs stay IN the pool (the user asked for non-key items, and a TM is
+  -- a legitimate pickup), but HMs, Mega Stones, Z-Crystals and the four
+  -- battle key items are excluded -- explicit user ban, see isBannedItemId
+  -- above.  Built once, then cached -- the item table does not change at
   -- runtime and a pickup should never walk ~250 records.
   local itemPool
   local function buildItemPool(data)
@@ -1786,7 +2295,8 @@ local function installRandomizer(mod, gen)
     local out = {}
     for id, rec in pairs(src) do
       if type(rec) == "table" and type(rec.name) == "string"
-          and rec.name ~= "" and not shared.isKeyItemId(id, rec) then
+          and rec.name ~= "" and not shared.isKeyItemId(id, rec)
+          and not shared.isBannedItemId(id, rec) then
         out[#out + 1] = id
       end
     end
@@ -2082,11 +2592,11 @@ local function installGen2(mod, shared)
         and save and save.party) then
       if not exportMod then
         shared.reportSceneProblem(self,
-          "BATTLE SCENE is ON but g9-Battle-Scene could not be reached (not "
+          "The battle scene is on but g9-Battle-Scene could not be reached (not "
           .. "installed, disabled, or failed to load), so this trainer battle "
           .. "used the native screen. Install/enable g9-Battle-Scene in the "
           .. "Mod Manager.",
-          "BATTLE SCENE is ON but\ng9-Battle-Scene is missing.\nEnable it in the Mod Manager.")
+          "The battle scene is on but\ng9-Battle-Scene is missing.\nEnable it in the Mod Manager.")
       end
       return false
     end
@@ -2101,9 +2611,18 @@ local function installGen2(mod, shared)
     -- trainer.party hook Battle.new calls moments later leaves them exactly
     -- as they are -- and the engine's own difficulty pass then lands on the
     -- very mons the screen is drawing.
-    opts.trainer.party = shared.randomizeParty(
-      shared.padTrainerParty(opts.trainer.party))
     local classId = opts.trainer.classId or opts.trainer.class
+    -- A gym leader / Elite Four keeps its own type theme through both the
+    -- team floor and the species swap (see GYM_THEMES).
+    local theme = shared.themeTypesFor(classId)
+    opts.trainer.party = shared.randomizeParty(
+      shared.padTrainerParty(opts.trainer.party, nil, theme), nil, theme)
+    -- LEAGUE ACES: the scene renders payload.enemies, not battle.enemyParty,
+    -- so the ace swap has to land HERE too (the native hook that already did
+    -- it for this party is a different array).  Same last-N rule, so a party
+    -- that already carries the aces is returned untouched.
+    opts.trainer.party = shared.applyLeagueAces(opts.trainer.party, classId,
+      opts.trainer.memberId or opts.trainer.id)
     -- The existing enemy battle's own shape picks the preset (see
     -- shared.layoutForTrainer's note): a boss is always "bossFight", a
     -- one-mon team takes the scene's "singles" screen -- never the game's
@@ -2111,15 +2630,19 @@ local function installGen2(mod, shared)
     -- first Gen 2 rival battle, RIVAL1's single stolen starter, was the case
     -- that surfaced it) -- an Elite Four battle rolls doubles-or-triples and
     -- every other 2+-mon team is a "doubles".
-    local layoutName = shared.layoutForTrainer(classId, #opts.trainer.party)
+    -- [2v2/3v3/4v1] OFF forces the scene's own "singles" layout for every
+    -- trainer fight; ON picks doubles/triples/bossFight from the existing
+    -- enemy battle (shared.layoutForTrainer is the one implementation).
+    local layoutName = shared.multiLayoutOn()
+      and shared.layoutForTrainer(classId, #opts.trainer.party) or "singles"
     local layoutData = exportMod.exports.getLayoutData
       and exportMod.exports.getLayoutData(layoutName)
     if not layoutData then
       shared.reportSceneProblem(self,
-        "BATTLE SCENE is ON and g9-Battle-Scene is loaded, but it has no '"
+        "The battle scene is on and g9-Battle-Scene is loaded, but it has no '"
         .. layoutName .. "' layout preset, so this trainer battle used the "
         .. "native screen. Update g9-Battle-Scene.",
-        "BATTLE SCENE is ON but the\nscene has no '" .. layoutName
+        "The battle scene is on but the\nscene has no '" .. layoutName
         .. "' layout.\\nUpdate g9-Battle-Scene.")
       return false
     end
@@ -2141,10 +2664,10 @@ local function installGen2(mod, shared)
     })
     if not pushed then
       shared.reportSceneProblem(self,
-        "BATTLE SCENE is ON and g9-Battle-Scene is loaded, but its '"
+        "The battle scene is on and g9-Battle-Scene is loaded, but its '"
         .. layoutName .. "' layout refused to push, so this trainer battle "
         .. "used the native screen.",
-        "BATTLE SCENE is ON but the\nscene refused this layout.\nIt used the native screen.")
+        "The battle scene is on but the\nscene refused this layout.\nIt used the native screen.")
       mod.log:warn("g9_battle_sample: no " .. layoutName .. " preset on "
         .. "the export mod, falling back to the ordinary trainer battle")
       return false
@@ -2176,12 +2699,13 @@ local function installGen2(mod, shared)
         end
       end
     end
-    -- BATTLE SCENE OFF -- every fight (wild, trainer, boss) goes to the
-    -- native screen; the scene is never consulted.  Checked AFTER the
-    -- rematch level bump above, which belongs to the REMATCHES option, not
-    -- the scene layer -- so a rematch keeps its +level even with the scene
-    -- off.  `onDone` is the plain slot World:startBattle already forwards.
-    if not shared.battleSceneOn() then
+    -- THE CUSTOM SCENE IS OFF (g9-Battle-Scene's own BACKGROUND row) -- every
+    -- fight (wild, trainer, boss) goes to the native screen; the scene is
+    -- never consulted.  Checked AFTER the rematch level bump above, which
+    -- belongs to the REMATCHES option, not the scene layer -- so a rematch
+    -- keeps its +level even with the scene off.  `onDone` is the plain slot
+    -- World:startBattle already forwards.
+    if not shared.sceneWanted() then
       return shared.withoutScene(function()
         return nativeStartBattle(self, opts, onDone)
       end)
@@ -2205,10 +2729,10 @@ local function installGen2(mod, shared)
         mod.log:warn("g9_battle_sample: no bossFight preset on the export "
           .. "mod, falling back to the ordinary battle screen for Eternatus")
         shared.reportSceneProblem(self,
-          "BATTLE SCENE is ON and g9-Battle-Scene is loaded, but its "
+          "The battle scene is on and g9-Battle-Scene is loaded, but its "
           .. "'bossFight' layout refused to push, so the Eternatus fight used "
           .. "the native screen.",
-          "BATTLE SCENE is ON but the\nscene refused the bossFight\nlayout. It used native.")
+          "The battle scene is on but the\nscene refused the bossFight\nlayout. It used native.")
       end
     elseif tryDoublesTrainer(self, opts) then
       return true
@@ -2225,12 +2749,13 @@ local function installGen2(mod, shared)
   local originalTryWildEncounter = World.tryWildEncounter
 
   function World:tryWildEncounter()
-    -- BATTLE SCENE OFF -- hand the wild roll straight to the native path.
-    -- The scoped startBattle swap below only exists to capture the roll for
-    -- the scene; with the scene off there is nothing to capture, so the
-    -- unmodified original is called directly and its own return value
-    -- (whether an encounter actually triggered) passes straight through.
-    if not shared.battleSceneOn() then
+    -- THE CUSTOM SCENE IS OFF (g9-Battle-Scene's BACKGROUND row) -- hand the
+    -- wild roll straight to the native path.  The scoped startBattle swap
+    -- below only exists to capture the roll for the scene; with the scene off
+    -- there is nothing to capture, so the unmodified original is called
+    -- directly and its own return value (whether an encounter actually
+    -- triggered) passes straight through.
+    if not shared.sceneWanted() then
       return originalTryWildEncounter(self)
     end
     local save = self.game and self.game.save
@@ -2270,11 +2795,11 @@ local function installGen2(mod, shared)
       mod.log:warn("g9_battle_sample: g9-Battle-Scene not available, "
         .. "falling back to a single wild battle")
       shared.reportSceneProblem(self,
-        "BATTLE SCENE is ON but g9-Battle-Scene could not be reached (not "
+        "The battle scene is on but g9-Battle-Scene could not be reached (not "
         .. "installed, disabled, or failed to load), so this wild encounter "
         .. "used the native screen. Install/enable g9-Battle-Scene in the "
         .. "Mod Manager.",
-        "BATTLE SCENE is ON but\ng9-Battle-Scene is missing.\nEnable it in the Mod Manager.")
+        "The battle scene is on but\ng9-Battle-Scene is missing.\nEnable it in the Mod Manager.")
       realStartBattle(self, capturedOpts)
       return true
     end
@@ -2298,24 +2823,40 @@ local function installGen2(mod, shared)
     -- 1-in-1000 roll, checked FIRST, so the four ordinary bands keep exactly
     -- the odds they had.  A boss wild scales its HP x1..x5 and gets a random
     -- boss-protection flag set after the scene is pushed.
-    local layoutName, isBossWild = shared.rollWildLayout(multiAlly)
+    -- [2v2/3v3/4v1] OFF skips the whole roll -- every wild fight is singles.
+    local layoutName, isBossWild
+    if shared.multiLayoutOn() then
+      layoutName, isBossWild = shared.rollWildLayout(multiAlly)
+    else
+      layoutName, isBossWild = "singles", false
+    end
 
-    -- Every extra enemy slot beyond the one real wild roll clones that
-    -- roll's own species/level (this file's own header, "Deliberately
-    -- simplified... extra enemy slots... clone that roll's own species/
-    -- level rather than rolling distinct wild mons per slot" -- this
-    -- engine's own tryWildEncounter commits to exactly one real roll,
-    -- there is no second, independent roll to ask for) -- which already
-    -- satisfies the horde's own real rule ("roll only one species and set
-    -- it to all 5 Pokemon") for free, via the SAME clone loop below
-    -- doubles/triples already used, no horde-specific branch needed.
+    -- Extra enemy slots.  A HORDE clones the one real roll's own
+    -- species+level (the cart's own rule: "roll one species and set it to all
+    -- 5 Pokemon").  A DOUBLES/TRIPLES wild fight instead draws each extra
+    -- slot INDEPENDENTLY (explicit user request): its own species pick off the
+    -- same roll, and its own level inside the area's natural spread -- so the
+    -- slots can differ, though nothing forbids two of them landing on the same
+    -- species.  The engine commits to exactly one real spawn roll, so an
+    -- "independent roll" is a fresh randomized pick per slot, not a second
+    -- spawn-table roll.  Any other layout (singles, the 0.5% bossFight) has a
+    -- single enemy slot anyway.
+    local independent = (layoutName == "doubles" or layoutName == "triples")
+      and shared.randWildsOn()
     local layoutData = exportMod.exports.getLayoutData and exportMod.exports.getLayoutData(layoutName)
     local enemyCount = math.max(1, math.min(6, (layoutData and layoutData.enemyCount) or 1))
     local allyCount = math.max(1, math.min(6, (layoutData and layoutData.allyCount) or 2))
 
-    local enemies = { capturedOpts.wild }
+    local base = capturedOpts.wild
+    local enemies = { base }
     for _ = 2, enemyCount do
-      enemies[#enemies + 1] = Mon.new(self.game.data, capturedOpts.wild.species, capturedOpts.wild.level)
+      local species, level = base.species, base.level
+      if independent then
+        level = shared.wildSlotLevel() or base.level
+        species = shared.wildSlotSpecies(base, level) or base.species
+      end
+      local mon = Mon.new(self.game.data, species, level)
+      if mon then enemies[#enemies + 1] = mon end
     end
     -- x1..x5 max HP for the 0.5% boss wild, before the scene reads it.
     if isBossWild then shared.scaleWildHp(capturedOpts.wild) end
@@ -2330,10 +2871,10 @@ local function installGen2(mod, shared)
       mod.log:warn("g9_battle_sample: no " .. layoutName .. " preset on the export mod, "
         .. "falling back to a single wild battle")
       shared.reportSceneProblem(self,
-        "BATTLE SCENE is ON and g9-Battle-Scene is loaded, but its '"
+        "The battle scene is on and g9-Battle-Scene is loaded, but its '"
         .. layoutName .. "' layout refused to push, so this wild encounter "
         .. "used the native screen.",
-        "BATTLE SCENE is ON but the\nscene refused this layout.\nIt used the native screen.")
+        "The battle scene is on but the\nscene refused this layout.\nIt used the native screen.")
       realStartBattle(self, capturedOpts)
     elseif isBossWild then
       shared.applyBossFlags(pushed)
@@ -2465,10 +3006,111 @@ local function installGen2(mod, shared)
   -- World:askYesNo stacks the YES/NO prompt on THAT box (so the question is
   -- never re-printed under the prompt).  The NPC is frozen up front so a
   -- wanderer cannot roll a new facing under the prompt.
+  -- ------------------------------------------------- G/S/C league leaders
+  -- In Gold/Silver/Crystal a gym leader -- and EVERY Elite Four member -- is
+  -- an OBJECTTYPE_SCRIPT object: its A press runs a map script that does its
+  -- own `loadtrainer FALKNER, FALKNER1` and its own `setflag ENGINE_ZEPHYRBADGE`,
+  -- NOT a `trainer` struct.  So def.trainer is nil, shared.isTrainerNpc is
+  -- false, and the gate below never saw a single gym: REMATCHES worked on the
+  -- ordinary trainer objects around them and only the leaders were silent.
+  --
+  -- The two facts the gate needs are both written in that object's own script
+  -- (its scriptKey is the leader's talk script), so read them off it instead
+  -- of keeping a hand-maintained map of sixteen gyms: the class/member the
+  -- press will load, and the already-beaten test the script opens on (its
+  -- `checkevent EVENT_BEAT_*`, or the `checkflag ENGINE_*BADGE` Blue and Clair
+  -- use).  A script with no loadtrainer, or whose loaded class is not in
+  -- GYM_CLASSES (a rival, a Rocket, the Champion), is left alone entirely.
+  local function gen2LeagueScript(world, npc)
+    local d = npc and npc.def
+    if type(d) ~= "table" or d.scriptKey == nil then return nil end
+    -- A trainer OBJECT already carries def.trainer; the ordinary gate owns it.
+    if type(d.trainer) == "table" then return nil end
+    local scripts = world and world.scripts
+    local list = type(scripts) == "table" and scripts[d.scriptKey] or nil
+    if type(list) ~= "table" then return nil end
+    local class, member, check, intro, win, loss
+    for _, cmd in ipairs(list) do
+      if type(cmd) == "table" then
+        if cmd.op == "loadtrainer" and cmd.class ~= nil then
+          class, member = cmd.class, cmd.member
+          break
+        end
+        if check == nil and (cmd.op == "checkevent" or cmd.op == "checkflag") then
+          check = cmd
+        end
+        if cmd.op == "winlosstext" then win, loss = cmd.winText, cmd.lossText end
+        if cmd.op == "writetext" or cmd.op == "farwritetext" then
+          intro = cmd.text
+        end
+      end
+    end
+    if class == nil or check == nil then return nil end
+    local classId = shared.gen2ClassName(class)
+    if not shared.isGymClass(classId) then return nil end
+    return { class = class, member = member or 1, classId = classId,
+             check = check, intro = intro, winText = win, lossText = loss }
+  end
+
+  -- Already beaten, by the leader's OWN test: the `checkevent EVENT_BEAT_*`
+  -- its FightDone branch hangs on, or the `checkflag ENGINE_*BADGE` that opens
+  -- Blue's and Clair's scripts.  Both read through the same stores the scripts
+  -- themselves read, so a badge handed over by any route counts.
+  local function gen2LeagueBeaten(world, league)
+    local check = league.check
+    if check.op == "checkevent" then
+      if world.events and type(world.events.get) == "function" then
+        local ok, set = pcall(world.events.get, world.events, check.event)
+        if ok and set then return true end
+      end
+      local save = shared.liveSave and shared.liveSave() or nil
+      return type(save) == "table" and type(save.events) == "table"
+        and save.events[check.event] == true
+    elseif check.op == "checkflag" then
+      if type(world.engineFlag) == "function" then
+        local ok, set = pcall(world.engineFlag, world, check.flag)
+        if ok and set then return true end
+      end
+      local save = shared.liveSave and shared.liveSave() or nil
+      return type(save) == "table" and type(save.engineFlags) == "table"
+        and save.engineFlags[check.flag] == true
+    end
+    return false
+  end
+
+  -- What YES starts: the leader's own intro line, win/loss text and
+  -- `loadtrainer` with the class/member its script would have loaded -- and
+  -- NOTHING after `reloadmapafterbattle`.  The badge/TM rows the native script
+  -- runs on a win are deliberately absent, so a rematch can never hand out a
+  -- badge or a second TM; the level ramp and the gym type theme ride the
+  -- ordinary trainer.party hook and startBattle wrap, exactly as for any other
+  -- rematch.
+  local function gen2LeagueRematchScript(league)
+    local script = { { op = "faceplayer" } }
+    if league.intro then
+      script[#script + 1] = { op = "opentext" }
+      script[#script + 1] = { op = "writetext", text = league.intro }
+      script[#script + 1] = { op = "waitbutton" }
+      script[#script + 1] = { op = "closetext" }
+    end
+    if league.winText then
+      script[#script + 1] = { op = "winlosstext",
+        winText = league.winText, lossText = league.lossText }
+    end
+    script[#script + 1] = { op = "loadtrainer", class = league.class,
+                            member = league.member }
+    script[#script + 1] = { op = "startbattle" }
+    script[#script + 1] = { op = "reloadmapafterbattle" }
+    script[#script + 1] = { op = "end" }
+    return script
+  end
+
   local nativeTalkTo = ow.talkTo
   ow.talkTo = function(world, npc)
     if shared.rematchesOn() and shared.isTrainerNpc(npc)
-        and shared.isBeatenTrainer(world, npc) then
+        and shared.isBeatenTrainer(world, npc)
+        and (not shared.isGymClass(shared.trainerClassOf(npc))
+             or shared.gymRematchesOn()) then
       world:freezeNpc(npc)
       world:showText("Do you want to battle again?", function()
         world:askYesNo(function(yes)
@@ -2476,6 +3118,28 @@ local function installGen2(mod, shared)
             world:startTrainerScript(npc, REMATCH_TALK_SCRIPT, nil)
           else
             world:startTrainerScript(npc, TALK_TO_TRAINER_SCRIPT_COPY, nil)
+          end
+        end)
+      end, true)
+      return true
+    end
+    -- GYM LEADERS / ELITE FOUR on Gen 2 (see gen2LeagueScript).  The ask and
+    -- the two answers are the same shape as the ordinary arm above: YES starts
+    -- the rematch, NO runs the leader's own script untouched -- its beaten
+    -- check sends it straight to the FightDone advice/TM line, exactly as if
+    -- the question had never been asked.
+    local league
+    if shared.rematchesOn() and shared.gymRematchesOn() then
+      league = gen2LeagueScript(world, npc)
+    end
+    if league and gen2LeagueBeaten(world, league) then
+      world:freezeNpc(npc)
+      world:showText("Do you want to battle again?", function()
+        world:askYesNo(function(yes)
+          if yes then
+            world:startTrainerScript(npc, gen2LeagueRematchScript(league), nil)
+          else
+            world:startTrainerScript(npc, npc.def.scriptKey, nil)
           end
         end)
       end, true)
@@ -2529,7 +3193,7 @@ local function installGen2(mod, shared)
     if type(nativeOwUpdate) == "function" then nativeOwUpdate(world, dt) end
     if not (world.player and world.map) then return end
     if world:busy() then return end
-    -- BATTLE SCENE ON with no reachable scene: the one-off notice queued at
+    -- The scene is on (BACKGROUND not OFF) but unreachable: the one-off notice queued at
     -- the fallback shows here, on the first idle frame after it (see
     -- shared.reportSceneProblem).
     shared.flushSceneProblem(world)
@@ -2547,15 +3211,17 @@ local function installGen2(mod, shared)
     end)
   end
 
-  mod.log:info("g9_battle_sample: with BATTLE SCENE on (the default), every "
+  mod.log:info("g9_battle_sample: with the scene on (g9-Battle-Scene's "
+    .. "BACKGROUND not OFF) and the 2v2/3v3/4v1 row on (the default), every "
     .. "wild encounter routes to "
     .. "g9-Battle-Scene -- 0.5%% \"bossFight\" (x1..x5 HP + random flags), then "
     .. "1%% \"hordes\", 2%% \"triples\", 10%% \"doubles\", ~86%% \"singles\" (the "
     .. "native scene is never called); every 2+-mon trainer battle routes to "
     .. "\"doubles\", the Elite Four rolls doubles/triples, and the Champion and "
     .. "Red route to \"bossFight\"; wild_forms's Eternatus-as-Eternamax static "
-    .. "routes to \"bossFight\" (with BATTLE SCENE off every fight uses the "
-    .. "native screen instead)")
+    .. "routes to \"bossFight\" (with BACKGROUND OFF every fight uses the "
+    .. "native screen, and with 2v2/3v3/4v1 OFF every fight takes \"singles\")")
+  return shared
 end
 
 
@@ -2739,21 +3405,22 @@ local function installGen1(mod, shared)
   -- call the native pushBattle), false to let native handle it.
   local function tryDivert(self, battle, trainerNpc)
     pendingTransition = nil
-    -- BATTLE SCENE OFF -- let the native pushBattle run for every battle
-    -- (returning false is exactly the "let native handle it" contract this
-    -- seam documents).  The native scene is generation-correct by itself:
-    -- Gen 1's own OverworldState:pushBattle on Red/Blue/Yellow.
-    if not shared.battleSceneOn() then return false end
+    -- THE CUSTOM SCENE IS OFF (g9-Battle-Scene's BACKGROUND row) -- let the
+    -- native pushBattle run for every battle (returning false is exactly the
+    -- "let native handle it" contract this seam documents).  The native scene
+    -- is generation-correct by itself: Gen 1's own
+    -- OverworldState:pushBattle on Red/Blue/Yellow.
+    if not shared.sceneWanted() then return false end
     local exportMod = shared.sceneHandle()
     if not (exportMod and exportMod.exports
         and exportMod.exports.pushLayoutBattle) then
       mod.log:warn("g9_battle_sample: g9-Battle-Scene not available, "
         .. "falling back to the ordinary Gen 1 battle screen")
       shared.reportSceneProblem(self,
-        "BATTLE SCENE is ON but g9-Battle-Scene could not be reached (not "
+        "The battle scene is on but g9-Battle-Scene could not be reached (not "
         .. "installed, disabled, or failed to load), so this battle used the "
         .. "native screen. Install/enable g9-Battle-Scene in the Mod Manager.",
-        "BATTLE SCENE is ON but\ng9-Battle-Scene is missing.\nEnable it in the Mod Manager.")
+        "The battle scene is on but\ng9-Battle-Scene is missing.\nEnable it in the Mod Manager.")
       return false
     end
     local save = Game.save
@@ -2780,11 +3447,18 @@ local function installGen1(mod, shared)
       -- battle's enemyParty in place, so both the model and the scene's own
       -- Gen 1 battlers -- built from exactly these mon tables -- see the
       -- additions.
-      local padded = shared.padTrainerParty(team)
+      local padded = shared.padTrainerParty(team, nil,
+        shared.themeTypesFor(battle.oppClass))
       if padded ~= team then
         battle.enemyParty = padded
         team = padded
       end
+      -- LEAGUE ACES: on Gen 1 the party the hook returned was plain rows, and
+      -- the engine has since built real Pokemon from them -- so the held
+      -- item / Tera / Dynamax fields are applied to the LAST N mons here.
+      -- Idempotent, and the native screen applies the same fields from its
+      -- own battle.started listener, so the two paths agree.
+      shared.applyLeagueAceProperties(team, battle.oppClass, battle.partyIndex)
       -- Defer entirely to a trainer explicitly registered through
       -- g9-battle-engine's own mod.exports.registerTrainer -- that
       -- registration's own combatType is the one real authority for what it
@@ -2803,7 +3477,8 @@ local function installGen1(mod, shared)
       -- own "singles" screen -- never the game's native one.  (The old
       -- `#team < 2` bail that sent a single-mon trainer fight to native is
       -- gone, so Gen 1 now matches Gen 2's RIVAL1 handling.)
-      layoutName = shared.layoutForTrainer(battle.oppClass, #team)
+      layoutName = shared.multiLayoutOn()
+        and shared.layoutForTrainer(battle.oppClass, #team) or "singles"
       -- The FULL team, not a slice -- the scene benches the extra mons for
       -- a trainer battle and sends them in as actives faint (see the Gen 2
       -- arm's own note).
@@ -2835,16 +3510,30 @@ local function installGen1(mod, shared)
         local multiAlly = #save.party >= 2
         -- 0.5% bossFight first, then the ordinary bands -- identical to the
         -- Gen 2 arm (shared.rollWildLayout is the one implementation).
-        layoutName, isBossWild = shared.rollWildLayout(multiAlly)
-        -- Every extra enemy slot clones the one real roll's own species/level
-        -- (this engine's tryWildEncounter commits to exactly one roll; there
-        -- is no second, independent roll to ask for), which already satisfies
-        -- the horde's own "all of them the same species" rule for free.
+        -- [2v2/3v3/4v1] OFF forces singles for every wild fight.
+        if shared.multiLayoutOn() then
+          layoutName, isBossWild = shared.rollWildLayout(multiAlly)
+        else
+          layoutName, isBossWild = "singles", false
+        end
+        -- Extra enemy slots, matching the Gen 2 arm exactly: a HORDE clones
+        -- the one real roll (same species+level for all), while a
+        -- DOUBLES/TRIPLES wild fight draws each slot independently -- its own
+        -- randomized species and its own level inside the area's natural
+        -- spread (explicit user request).  The engine commits to exactly one
+        -- real spawn roll, so this is a fresh pick per slot, not a second
+        -- spawn-table roll.
+        local independent = (layoutName == "doubles" or layoutName == "triples")
+          and shared.randWildsOn()
         local enemyCount = rosterSize(exportMod, layoutName, "enemyCount", 1)
         enemies = { enemy }
         for _ = 2, enemyCount do
-          enemies[#enemies + 1] = Pokemon.new(Game.data, enemy.species,
-            enemy.level)
+          local species, level = enemy.species, enemy.level
+          if independent then
+            level = shared.wildSlotLevel() or enemy.level
+            species = shared.wildSlotSpecies(enemy, level) or enemy.species
+          end
+          enemies[#enemies + 1] = Pokemon.new(Game.data, species, level)
         end
         -- x1..x5 max HP for the 0.5% boss wild, before the scene reads it.
         if isBossWild then shared.scaleWildHp(enemy) end
@@ -2858,10 +3547,10 @@ local function installGen1(mod, shared)
       mod.log:warn("g9_battle_sample: no " .. layoutName .. " preset on "
         .. "the export mod, falling back to the ordinary Gen 1 battle screen")
       shared.reportSceneProblem(self,
-        "BATTLE SCENE is ON and g9-Battle-Scene is loaded, but it has no '"
+        "The battle scene is on and g9-Battle-Scene is loaded, but it has no '"
         .. layoutName .. "' layout preset, so this Gen 1 battle used the "
         .. "native screen. Update g9-Battle-Scene.",
-        "BATTLE SCENE is ON but the\nscene has no '" .. layoutName
+        "The battle scene is on but the\nscene has no '" .. layoutName
         .. "' layout.\nUpdate g9-Battle-Scene.")
       return false
     end
@@ -2893,10 +3582,10 @@ local function installGen1(mod, shared)
       mod.log:warn("g9_battle_sample: " .. layoutName .. " refused to "
         .. "push, falling back to the ordinary Gen 1 battle screen")
       shared.reportSceneProblem(self,
-        "BATTLE SCENE is ON and g9-Battle-Scene is loaded, but its '"
+        "The battle scene is on and g9-Battle-Scene is loaded, but its '"
         .. layoutName .. "' layout refused to push, so this Gen 1 battle used "
         .. "the native screen.",
-        "BATTLE SCENE is ON but the\nscene refused this layout.\nIt used the native screen.")
+        "The battle scene is on but the\nscene refused this layout.\nIt used the native screen.")
       return false
     end
     -- Random boss protections: the 0.5% wild bossFight, and a Champion/Red
@@ -3155,7 +3844,10 @@ local function installGen1(mod, shared)
     -- mapScripts already owns (a rival, the Rocket hideout, a gym leader's own
     -- retry line) keeps its script, exactly as if REMATCHES were off.
     if shared.rematchesOn() and shared.isTrainerNpc(npc)
-        and shared.isBeatenTrainer(self, npc) and canRematch(self, d) then
+        and shared.isBeatenTrainer(self, npc)
+        and (canRematch(self, d)
+             or (shared.gymRematchesOn()
+                 and shared.isGymClass(shared.trainerClassOf(d)))) then
       npc.frozen = true
       self:makeNpcFacePlayer(npc)
       local function finish() npc.frozen = false end
@@ -3224,7 +3916,7 @@ local function installGen1(mod, shared)
   function OverworldState:update(dt)
     nativeUpdate(self, dt)
     if not (self.player and self.map and overworldIdle(self)) then return end
-    -- BATTLE SCENE ON with no reachable scene: the one-off notice queued at
+    -- The scene is on (BACKGROUND not OFF) but unreachable: the one-off notice queued at
     -- the fallback shows here, on the first idle frame after it (see
     -- shared.reportSceneProblem).
     shared.flushSceneProblem(self)
@@ -3243,15 +3935,17 @@ local function installGen1(mod, shared)
     end)
   end
 
-  mod.log:info("g9_battle_sample: with BATTLE SCENE on (the default), Gen 1 "
+  mod.log:info("g9_battle_sample: with the scene on (g9-Battle-Scene's "
+    .. "BACKGROUND not OFF) and the 2v2/3v3/4v1 row on (the default), Gen 1 "
     .. "wild encounters route to "
     .. "g9-Battle-Scene (0.5%% \"bossFight\" with x1..x5 HP + random flags, "
     .. "1%% \"hordes\", 2%% \"triples\", 10%% \"doubles\", ~86%% \"singles\"); "
     .. "every 2+-mon trainer battle routes to \"doubles\", the Elite Four "
     .. "rolls doubles/triples, and the Champion (OPP_RIVAL3) routes to "
     .. "\"bossFight\"; wild_forms's Eternatus-as-Eternamax static routes to "
-    .. "\"bossFight\" (with BATTLE SCENE off the native Gen 1 screen runs "
-    .. "instead)")
+    .. "\"bossFight\" (with BACKGROUND OFF the native Gen 1 screen runs "
+    .. "instead, and with 2v2/3v3/4v1 OFF every fight takes \"singles\")")
+  return shared
 end
 
 -- The BLACKLIST window added 2026-09-18 (explicit user request): a custom
@@ -3775,10 +4469,592 @@ local function installBlacklist(mod, gen, shared)
         end
       end,
     }
+    -- LEAGUE ACES: only offered while RAND TRAINER MONS is on, because the
+    -- row is meaningless without it (the aces are the slots the randomizer
+    -- would otherwise overwrite).  The Mod Manager carries the same row (see
+    -- options.lua's `league_aces`, hidden by its own `visible_if` unless RAND
+    -- TRAINER MONS is on); this OPTIONS-menu row is the in-session flip, and
+    -- an explicit flip wins over the manager's configured value.
+    if shared.randTrainersOn and shared.randTrainersOn() then
+      result[#result + 1] = {
+        id = "league_aces",
+        label = "LEAGUE ACES",
+        value = function()
+          return (shared.leagueAcesOn and shared.leagueAcesOn()) and "ON" or "OFF"
+        end,
+        activate = function()
+          if shared.leagueAcesToggle then shared.leagueAcesToggle() end
+        end,
+      }
+    end
     return result
   end, 0)
 
   mod.log:info("g9_battle_sample: BLACKLIST screen installed (Gen %d)", gen)
+end
+
+-- ===========================================================================
+-- LEAGUE ACES -- the signature Pokemon a league trainer keeps despite RAND
+-- TRAINER MONS.
+-- ===========================================================================
+-- Explicit user request, 2026-09-23: a [LEAGUE ACES] ON/OFF row that only
+-- appears on the OPTIONS menu while RAND TRAINER MONS is on, and a table of
+-- the gym leaders / Elite Four / Champions / Red, each with the Pokemon that
+-- should sit at the END of their team.
+--
+-- HOW IT WORKS.  `applyLeagueAces` runs AFTER the difficulty team floor and
+-- after `randomizeParty`, and REPLACES the last N slots with the N listed
+-- aces (N = the number of entries for that class; the early slots keep the
+-- randomized/padded team they already had).  The aces are therefore never
+-- run through the randomizer and never evolved by it -- which is exactly
+-- what "ignoring randomizer for these specific slots" asks for -- while the
+-- rest of the team behaves exactly as before.
+--
+-- WHAT AN ACE KEEPS, and what it does not:
+--   * SPECIES and MOVESET are fixed.  "Original move set" is the species'
+--     own vanilla level-up moves; an entry marked "(inherits X moves)" takes
+--     the PRE-evolution's level-up set instead (Rhyperior keeps Rhydon's,
+--     Magnezone keeps Magneton's, Venusaur-Mega keeps Venusaur's), and the
+--     two entries that name an extra move (Lance's Dragonite -> Hurricane,
+--     Red's Venusaur -> Weather Ball) have it forced into the four.
+--   * NATURE / IVs / EVs come from the DIFFICULTY setting like every other
+--     trainer mon -- the mod's own registerTrainerStatsProvider already
+--     computes them, and these aces are ordinary party members.  A couple of
+--     entries carry their own explicit spread instead (Lance's Dragonite is
+--     "special and speed trained"), which is applied after the difficulty
+--     pass so it wins.
+--   * HELD ITEM is the one the entry names (Eviolite, a Mega Stone, Light
+--     Ball), and it is what makes a Mega / Gigantamax form happen: the SAME
+--     stored-property route a wild SPECIAL BOSS uses -- battle_forms deploys
+--     the transformation when it deploys.  A Tera type and a Dynamax level
+--     are stored the same way.
+--   * "doesn't evolve" is informational: an ace is never pushed to its
+--     latest evolution, so a Pidgeotto stays a Pidgeotto (which is why it
+--     can hold an Eviolite).
+--
+-- LEVELS: an ace takes the level of the slot it fills, so the DIFFICULTY
+-- team floor and the +LEVEL PER REMATCH ramp keep working and no league
+-- fight is silently re-levelled.
+--
+-- INSTALLATION: a separate top-level function on purpose.  `installRandomizer`
+-- is already enormous, and LÖVE/LuaJIT caps a function at 200 active locals;
+-- keeping this here means that budget is untouched.  Only the small hooks
+-- inside installRandomizer/installGen1/installGen2 call into it.
+local function installLeagueAces(mod, shared)
+  local LEAGUE_ACE_KEY = "league_aces"
+  local unpack = table.unpack or unpack
+
+  local function dataNow() return shared.liveData and shared.liveData() or nil end
+  local function saveNow() return shared.liveSave and shared.liveSave() or nil end
+
+  local function engineExports()
+    local engine = mod.find and mod.find("g9-battle-engine")
+    return engine and engine.exports or nil
+  end
+
+  -- The state, in two layers.  The Mod Manager's own LEAGUE ACES row
+  -- (options.lua / the schema this file defines) is the CONFIGURED value and
+  -- defaults ON; the in-game OPTIONS menu's row flips it in-session by writing
+  -- a boolean into the save under the same key, and that explicit flip then
+  -- WINS -- so a fresh game starts from the manager setting, and the OPTIONS
+  -- row stays the quick toggle it has always been.  `leagueAcesOn` also folds
+  -- in the randomizer gate (the ace slots only mean anything as protection
+  -- FROM the randomizer), so every consumer -- the applier and both value
+  -- displays -- agrees.
+  local function leagueAcesOn()
+    if not (shared.randTrainersOn and shared.randTrainersOn()) then return false end
+    local save = mod.save
+    if save and type(save.get) == "function" then
+      local ok, value = pcall(save.get, save, LEAGUE_ACE_KEY)
+      if ok and type(value) == "boolean" then return value end
+    end
+    local options = mod.options
+    if options and type(options.get) == "function" then
+      local ok, value = pcall(options.get, options, LEAGUE_ACE_KEY)
+      if ok and type(value) == "boolean" then return value end
+    end
+    return true
+  end
+  shared.leagueAcesOn = leagueAcesOn
+
+  function shared.leagueAcesToggle()
+    local save = mod.save
+    if not (save and type(save.set) == "function") then return end
+    pcall(save.set, save, LEAGUE_ACE_KEY, not leagueAcesOn())
+  end
+
+  -- ------------------------------------------------ spec constructors
+  -- battle_forms' own Mega Stone ids (the same table g9-Battle-Scene's
+  -- special_boss.lua transcribes).  HOLDING the stone is what lets
+  -- battle_forms' trainer AI Mega-evolve the mon.
+  local MEGA_STONE = {
+    ALAKAZAM = "ALAKAZITE", STEELIX = "STEELIXITE", STARMIE = "STARMIITE",
+    GYARADOS = "GYARADOSITE", BEEDRILL = "BEEDRILLITE",
+    HOUNDOOM = "HOUNDOOMINITE", SLOWBRO = "SLOWBRONITE", GENGAR = "GENGARITE",
+    TYRANITAR = "TYRANITARITE", PIDGEOT = "PIDGEOTITE",
+    VENUSAUR = "VENUSAURITE", BLASTOISE = "BLASTOISINITE",
+    CHARIZARD_X = "CHARIZARDITE_X",
+    RAICHU_X = "RAICHUITE_X", RAICHU_Y = "RAICHUITE_Y",
+  }
+
+  local function ace(species, fields)
+    local spec = { species = species }
+    for k, v in pairs(fields or {}) do spec[k] = v end
+    return spec
+  end
+  local function mega(species, variant)
+    local key = variant and (species .. "_" .. variant) or species
+    return ace(species, { item = MEGA_STONE[key] })
+  end
+  local function gmax(species) return ace(species, { gmax = true }) end
+  local function dyna(species) return ace(species, { dyna = true }) end
+  local function tera(species, typeId) return ace(species, { tera = typeId }) end
+
+  -- ------------------------------------------------ the Champion sets
+  -- Gen 1's champion (the rival) is the one team that is not a fixed list.
+  -- Yellow has no single rival starter, so one of the three sets is rolled
+  -- FRESH EVERY BATTLE.  Red/Blue pick by the PLAYER's starter -- the rival's
+  -- own starter is always the counterpick -- Squirtle -> the Venusaur set,
+  -- Charmander -> the Blastoise set, Bulbasaur -> the Charizard set.  A save
+  -- that has not recorded a starter yet falls back to the rival's own
+  -- starter, then to the Venusaur set.
+  local function gen1ChampionAces()
+    local yellow = {
+      { ace("SANDSLASH"), mega("ALAKAZAM"), ace("EXEGGUTOR"), ace("NINETALES"),
+        ace("MAGNEZONE", { dyna = true, movesFrom = "MAGNETON" }),
+        tera("VAPOREON", "FIRE") },
+      { ace("SANDSLASH"), mega("ALAKAZAM"), ace("EXEGGUTOR"),
+        dyna("CLOYSTER"), ace("NINETALES"), tera("JOLTEON", "ELECTRIC") },
+      { ace("SANDSLASH"), mega("ALAKAZAM"), ace("EXEGGUTOR"),
+        ace("MAGNEZONE", { movesFrom = "MAGNETON" }),
+        tera("CLOYSTER", "WATER"), dyna("FLAREON") },
+    }
+    local save = saveNow()
+    local playerStarter = save and save.playerStarter
+    if playerStarter == "PIKACHU" then
+      return yellow[love.math.random(1, #yellow)]
+    end
+    local byPlayer = {
+      SQUIRTLE = { ace("PIDGEOT"), ace("ALAKAZAM"),
+        ace("RHYPERIOR", { movesFrom = "RHYDON" }),
+        tera("GYARADOS", "WATER"), dyna("ARCANINE"), mega("VENUSAUR") },
+      CHARMANDER = { ace("PIDGEOT"), ace("ALAKAZAM"),
+        ace("RHYPERIOR", { movesFrom = "RHYDON" }),
+        dyna("EXEGGUTOR"), tera("ARCANINE", "FIRE"), mega("BLASTOISE") },
+      BULBASAUR = { mega("PIDGEOT"), ace("ALAKAZAM"),
+        ace("RHYPERIOR", { movesFrom = "RHYDON" }),
+        tera("GYARADOS", "WATER"), ace("EXEGGUTOR"), gmax("CHARIZARD") },
+    }
+    local set = byPlayer[playerStarter]
+    if set then return set end
+    local byRival = { VENUSAUR = "SQUIRTLE", BLASTOISE = "CHARMANDER",
+                      CHARIZARD = "BULBASAUR" }
+    set = byPlayer[byRival[save and save.rivalStarter]]
+    if set then return set end
+    return byPlayer.SQUIRTLE
+  end
+
+  -- ------------------------------------------------ the teams
+  -- One list per trainer class.  Class ids are the engine's own (Gen 1 spells
+  -- Kanto OPP_*, Gen 2 uses the plain class name), so the Johto/Kanto and
+  -- Gen 1/Gen 2 look-alikes never collide.  The LAST entry is the last slot.
+  local LEAGUE_ACES = {
+    -- Gen 1 Kanto gyms
+    OPP_BROCK = { ace("ONIX") },
+    OPP_MISTY = { ace("PSYDUCK"), ace("STARMIE") },
+    OPP_LT_SURGE = { ace("RAICHU") },
+    OPP_ERIKA = { ace("VILEPLUME") },
+    OPP_KOGA = { ace("MUK"), ace("WEEZING") },
+    OPP_SABRINA = { ace("ALAKAZAM") },
+    OPP_BLAINE = { ace("ARCANINE"), ace("NINETALES") },
+    OPP_GIOVANNI = { ace("NIDOKING"), ace("NIDOQUEEN"), ace("RHYPERIOR") },
+    -- Gen 1 Elite Four
+    OPP_LORELEI = { ace("SLOWBRO"), ace("LAPRAS"), ace("CLOYSTER") },
+    OPP_BRUNO = { ace("MACHAMP"), ace("HITMONLEE"), ace("HITMONCHAN") },
+    OPP_AGATHA = { ace("GENGAR"), ace("MISMAGIUS") },
+    OPP_LANCE = { ace("DRAGONITE"), ace("GYARADOS") },
+    -- Gen 1 Champion (the rival)
+    OPP_RIVAL3 = gen1ChampionAces,
+    -- Gen 2 Johto gyms
+    FALKNER = { ace("PIDGEOTTO", { item = "EVIOLITE" }), ace("NOCTOWL") },
+    BUGSY = { ace("SCYTHER", { item = "EVIOLITE" }) },
+    WHITNEY = { ace("CLEFAIRY"), ace("MILTANK") },
+    MORTY = { ace("GENGAR"), ace("MISMAGIUS") },
+    CHUCK = { ace("POLIWRATH"), ace("ANNIHILAPE") },
+    JASMINE = { ace("MAGNEZONE"), ace("STEELIX") },
+    PRYCE = { ace("PILOSWINE", { item = "EVIOLITE" }), ace("MAMOSWINE") },
+    CLAIR = { ace("KINGDRA"), ace("DRAGONAIR", { item = "EVIOLITE" }) },
+    -- Gen 2 Kanto gyms
+    BROCK = { ace("ONIX", { item = "EVIOLITE" }), mega("STEELIX") },
+    MISTY = { ace("POLITOED"), ace("GOLDUCK"), ace("LAPRAS"), ace("QUAGSIRE"),
+              mega("STARMIE") },
+    LT_SURGE = { ace("PIKACHU", { item = "LIGHTBALL" }), ace("RAICHU_ALOLA"),
+                 ace("ELECTIVIRE"),
+                 { pick = { mega("RAICHU", "Y"), mega("RAICHU", "X") } } },
+    ERIKA = { ace("TANGROWTH"), ace("VICTREEBEL"), tera("VILEPLUME", "POISON") },
+    JANINE = { ace("WEEZING"), ace("CROBAT"), mega("BEEDRILL") },
+    SABRINA = { ace("MR_MIME"), ace("ESPEON"), mega("ALAKAZAM") },
+    BLAINE = { ace("MAGMORTAR"), mega("HOUNDOOM") },
+    BLUE = { ace("PIDGEOT"), ace("ALAKAZAM"), ace("RHYPERIOR"),
+             ace("EXEGGUTOR"), ace("ARCANINE"), mega("GYARADOS") },
+    -- Gen 2 Elite Four
+    WILL = { ace("XATU"), mega("SLOWBRO") },
+    KOGA = { ace("CROBAT"), ace("ARIADOS"), mega("GENGAR") },
+    BRUNO = { ace("HITMONTOP"), ace("HITMONLEE"), ace("HITMONCHAN"),
+              ace("ANNIHILAPE"), gmax("MACHAMP") },
+    KAREN = { ace("UMBREON"), ace("HONCHKROW"), mega("TYRANITAR") },
+    -- Gen 2 Champion (Lance) and the secret final boss (Red)
+    CHAMPION = { ace("DRAGONAIR", { item = "EVIOLITE" }), ace("AERODACTYL"),
+                 ace("GYARADOS"), dyna("KINGDRA"),
+                 ace("DRAGONITE", { tera = "FLYING",
+                   alsoMoves = { "HURRICANE" }, nature = "MODEST",
+                   ivs = { hp = 31, atk = 31, def = 31, spa = 31, spd = 31, spe = 31 },
+                   evs = { hp = 4, atk = 0, def = 0, spa = 252, spd = 0, spe = 252 } }),
+                 mega("CHARIZARD", "X") },
+    RED = { { pick = { "JOLTEON", "FLAREON", "VAPOREON", "ESPEON", "UMBREON" } },
+            ace("SNORLAX"), gmax("CHARIZARD"),
+            ace("VENUSAUR", { tera = "FIRE", alsoMoves = { "WEATHERBALL" } }),
+            mega("BLASTOISE"),
+            ace("PIKACHU_STARTER", { item = "LIGHTBALL",
+              moves = { "ZIPPYZAP", "FLOATYFALL", "SPLISHYSPLASH",
+                        "PIKA_PAPOW" } }) },
+  }
+
+  -- ------------------------------------------------ move sets
+  -- The level-up move ids a species knows at `level`, read straight off the
+  -- running game's species record (Gen 2 spells them `levelMoves`; Gen 1 has
+  -- `level1Moves` + `learnset`).  Only used for a "(inherits X moves)" entry
+  -- and for forcing an extra move into one; an ace with neither leaves its
+  -- moveset nil and the engine builds the species' own, exactly as every
+  -- other trainer mon does.
+  local function levelUpMoveIds(data, speciesId, level)
+    local def = data and data.pokemon and data.pokemon[speciesId]
+    if type(def) ~= "table" then return nil end
+    local ids = {}
+    local function add(id)
+      if type(id) ~= "string" then return end
+      for _, existing in ipairs(ids) do if existing == id then return end end
+      ids[#ids + 1] = id
+    end
+    if type(def.levelMoves) == "table" then
+      for _, entry in ipairs(def.levelMoves) do
+        if type(entry) == "table" and (entry.level or 0) <= level then
+          add(entry.move)
+        end
+      end
+    else
+      if type(def.level1Moves) == "table" then
+        for _, id in ipairs(def.level1Moves) do add(id) end
+      end
+      if type(def.learnset) == "table" then
+        for _, entry in ipairs(def.learnset) do
+          if type(entry) == "table" and (entry.level or 0) <= level then
+            add(entry.move)
+          end
+        end
+      end
+    end
+    while #ids > 4 do table.remove(ids, 1) end
+    return #ids > 0 and ids or nil
+  end
+
+  -- Every spelling of the fourth Let's Go partner-Pikachu move ("Pika Papow").
+  -- The national_dex build this repo references registers Zippy Zap, Floaty
+  -- Fall and Splishy Splash but NOT Pika Papow, so a hard-coded id can be an
+  -- empty move slot.  Ask the RUNNING game's move table for each spelling and
+  -- only fall back to Thunderbolt when none is present -- so a build that does
+  -- have the real move uses it, and every other build still gets four moves.
+  local PIKA_PAPOW_IDS = { "PIKA_PAPOW", "PIKAPAPOW", "PIKAPOW" }
+  local function isPikaPapow(id)
+    for _, candidate in ipairs(PIKA_PAPOW_IDS) do
+      if id == candidate then return true end
+    end
+    return false
+  end
+  local function resolveMoveId(data, id)
+    local moves = data and data.moves
+    if type(moves) ~= "table" then
+      return isPikaPapow(id) and "THUNDERBOLT" or id
+    end
+    if moves[id] then return id end
+    if isPikaPapow(id) then
+      for _, candidate in ipairs(PIKA_PAPOW_IDS) do
+        if moves[candidate] then return candidate end
+      end
+      return "THUNDERBOLT"
+    end
+    return id
+  end
+
+  local function computeAceMoves(data, spec, level)
+    local moves
+    if type(spec.moves) == "table" and #spec.moves > 0 then
+      moves = {}
+      for _, id in ipairs(spec.moves) do
+        moves[#moves + 1] = resolveMoveId(data, id)
+      end
+    else
+      moves = levelUpMoveIds(data, spec.movesFrom or spec.species, level)
+      if moves then
+        local copy = {}
+        for _, id in ipairs(moves) do copy[#copy + 1] = id end
+        moves = copy
+      end
+    end
+    if moves and type(spec.alsoMoves) == "table" then
+      for _, extra in ipairs(spec.alsoMoves) do
+        local present = false
+        for _, id in ipairs(moves) do if id == extra then present = true end end
+        if not present then
+          moves[#moves + 1] = extra
+          while #moves > 4 do table.remove(moves, 1) end
+        end
+      end
+    end
+    return moves
+  end
+
+  -- ------------------------------------------------ property application
+  -- The stored gimmick/item fields, applied to a real mon object.  The
+  -- engine's own setters are used when this engine exposes them (they also
+  -- mirror the value into battle_forms' own field), with a plain-field
+  -- fallback so this still works against an older engine.
+  local ACE_STAT_KEYS = { "hp", "atk", "def", "spa", "spd", "spe" }
+
+  local function applyAceStats(mon, spec)
+    local MS = engineExports() and engineExports().ModernStats
+    if not (type(MS) == "table" and type(MS.applySpec) == "function") then return end
+    local ivs = spec.ivs or mon.ivs
+    local evs = spec.evs or mon.evs
+    local nature = spec.nature or mon.nature
+    local order = MS.ORDER
+    if type(order) ~= "table" then order = ACE_STAT_KEYS end
+    local specT = { nature = nature }
+    for _, k in ipairs(order) do
+      specT[k] = { iv = (type(ivs) == "table" and ivs[k]) or 31,
+                   ev = (type(evs) == "table" and evs[k]) or 0 }
+    end
+    if not pcall(MS.applySpec, mon, specT) then return end
+    if type(MS.recalcAll) == "function" then
+      local data = dataNow()
+      local nd = mod.find and mod.find("national_dex")
+      local def = data and data.pokemon and data.pokemon[mon.species]
+      if type(MS.resolveBase) == "function" then
+        local ok, resolved = pcall(MS.resolveBase, mon.species, def,
+          nd and nd.exports)
+        if ok and type(resolved) == "table" then def = resolved end
+      end
+      if type(def) == "table" then pcall(MS.recalcAll, def, mon) end
+    end
+    local maxHp = tonumber(mon.maxHp) or (type(mon.stats) == "table" and tonumber(mon.stats.hp))
+    if maxHp and tonumber(mon.hp) and mon.hp > maxHp then mon.hp = maxHp end
+  end
+
+  local function applyAceToMon(mon, spec)
+    if type(mon) ~= "table" or type(spec) ~= "table" then return end
+    if spec.item then mon.item = spec.item end
+    local ex = engineExports()
+    if spec.tera then
+      local setter = ex and ex.setTeraType
+      local ok = type(setter) == "function" and pcall(setter, mon, spec.tera)
+      if not ok then
+        mon.teraType = spec.tera
+        mon.battleFormsTeraType = spec.tera
+      end
+    end
+    if spec.gmax then
+      local setter = ex and ex.setGigantamaxFactor
+      local ok = type(setter) == "function" and pcall(setter, mon, true)
+      if not ok then mon.gigantamaxFactor = true end
+    end
+    if spec.gmax or spec.dyna then
+      local setter = ex and ex.setMonDynamaxLevel
+      local ok = type(setter) == "function" and pcall(setter, mon, 10)
+      if not ok then mon.dynamaxLevel = 10 end
+    end
+    if spec.nature or spec.evs or spec.ivs then applyAceStats(mon, spec) end
+  end
+
+  -- One `pick` alternative resolved for this battle (a bare species string is
+  -- just that species).  Called once per slot, at BOTH the injection and the
+  -- property pass, so the two agree by construction (the property pass
+  -- matches the resolved species against the mon actually standing there).
+  local function resolveAcePick(spec)
+    if type(spec) ~= "table" then return nil end
+    if type(spec.pick) == "table" and #spec.pick > 0 then
+      local alt = spec.pick[love.math.random(1, #spec.pick)]
+      if type(alt) == "string" then return ace(alt) end
+      return alt
+    end
+    return spec
+  end
+
+  local function concreteAceSpec(spec, species)
+    if type(spec) ~= "table" then return nil end
+    if type(spec.pick) == "table" then
+      for _, alt in ipairs(spec.pick) do
+        local resolved = (type(alt) == "string") and ace(alt) or alt
+        if type(resolved) == "table" and resolved.species == species then
+          return resolved
+        end
+      end
+      return nil
+    end
+    if spec.species == species then return spec end
+    return nil
+  end
+
+  -- A party entry is a real Mon object when it carries the Gen 1/Gen 2 stat
+  -- fields the randomizer's own mon/row test keys on (see randomizeParty).
+  local function isMonEntry(entry)
+    return type(entry) == "table"
+      and (type(entry.stats) == "table" or type(entry.dvs) == "table")
+  end
+
+  local function buildAceEntry(data, spec, level, monMode)
+    if type(spec) ~= "table" or type(spec.species) ~= "string" then return nil end
+    level = tonumber(level) or 5
+    local ids = computeAceMoves(data, spec, level)
+    if monMode then
+      local ok, Mon = pcall(require, "src.battle.gen2.Mon")
+      if not (ok and type(Mon) == "table" and type(Mon.new) == "function") then
+        return nil
+      end
+      local opts = {}
+      if spec.item then opts.item = spec.item end
+      if ids then
+        local slots = {}
+        for _, id in ipairs(ids) do
+          local md = data and data.moves and data.moves[id]
+          slots[#slots + 1] = { id = id, pp = md and md.pp or 0,
+            maxPp = md and md.pp or 0 }
+        end
+        opts.moves = slots
+      end
+      local okNew, mon = pcall(Mon.new, data, spec.species, level, opts)
+      if not (okNew and type(mon) == "table") then return nil end
+      mon.__g9sampleAce = true
+      -- The RESOLVED spec (a `pick` already chosen), so the later property
+      -- pass re-applies the very same item/gimmick rather than re-rolling
+      -- an ambiguous pick (Lt. Surge's Raichu X/Y share a species).
+      mon.__g9sampleAceSpec = spec
+      applyAceToMon(mon, spec)
+      return mon
+    end
+    -- A Gen 1 row: the base engine's own builder reads species/level/moves
+    -- only, so the held item and the gimmick fields are applied to the real
+    -- mon later (see applyLeagueAceProperties).  (The spec stamp is carried
+    -- too, but a built Pokemon does not keep it -- the property pass then
+    -- matches by species instead, which is exact because no Gen 1 ace is a
+    -- `pick`.)
+    return { species = spec.species, level = level, moves = ids,
+             item = spec.item, __g9sampleAce = true, __g9sampleAceSpec = spec }
+  end
+
+  -- ------------------------------------------------ the public seams
+  -- An entry that is a FUNCTION (only the Gen 1 champion, whose set is rolled
+  -- fresh each battle) must resolve to the SAME set for a whole fight:
+  -- `applyLeagueAces` builds the rows from it and `applyLeagueAceProperties`
+  -- later matches those rows' species to apply their items/gimmicks.  The
+  -- roll is therefore memoised for the build+property pair and cleared at the
+  -- next `applyLeagueAces` (the one place a trainer's party is built).  The
+  -- PUBLIC leagueAcesFor below deliberately rolls fresh every call.
+  local rolledEntry = nil
+  local function acesForBuild(classId, memberId)
+    if type(classId) ~= "string" then return nil end
+    if not leagueAcesOn() then return nil end
+    local entry = LEAGUE_ACES[classId]
+    if entry == nil then return nil end
+    if type(entry) == "function" then
+      if rolledEntry == nil then rolledEntry = entry(classId, memberId) end
+      entry = rolledEntry
+    end
+    if type(entry) ~= "table" or #entry == 0 then return nil end
+    return entry
+  end
+
+  -- What the champion will field, rolled fresh: the row the OPTIONS menu and
+  -- any caller reads.
+  function shared.leagueAcesFor(classId, memberId)
+    if type(classId) ~= "string" then return nil end
+    if not leagueAcesOn() then return nil end
+    local entry = LEAGUE_ACES[classId]
+    if entry == nil then return nil end
+    if type(entry) == "function" then entry = entry(classId, memberId) end
+    if type(entry) ~= "table" or #entry == 0 then return nil end
+    return entry
+  end
+
+  -- Replace the final slots with the aces.  Returns the SAME array whenever
+  -- nothing is done (row off, not a league class, or the party already
+  -- carries an ace), so the engine's own identity-preserving passes are
+  -- undisturbed.
+  function shared.applyLeagueAces(party, classId, memberId)
+    if type(party) ~= "table" or #party == 0 then return party end
+    rolledEntry = nil -- a new party build re-rolls the champion's set
+    local aces = acesForBuild(classId, memberId)
+    if not aces then return party end
+    for i = 1, #party do
+      local entry = party[i]
+      if type(entry) == "table" and entry.__g9sampleAce then return party end
+    end
+    local data = dataNow()
+    local monMode = isMonEntry(party[1])
+    local n = #aces
+    local keep = #party - n
+    if keep < 0 then keep = 0 end
+    local fallbackLevel = party[#party] and party[#party].level or 5
+    local out = {}
+    for i = 1, keep do out[i] = party[i] end
+    for i = 1, n do
+      local src = party[keep + i]
+      local level = (src and src.level) or fallbackLevel
+      local spec = resolveAcePick(aces[i])
+      out[keep + i] = buildAceEntry(data, spec, level, monMode) or src
+    end
+    return out
+  end
+
+  -- Apply the stored item/gimmick/stat properties to the aces already in
+  -- `team` (the last N slots).  Idempotent, so the Gen 1 scene path and the
+  -- battle.started listener can both call it.
+  function shared.applyLeagueAceProperties(team, classId, memberId)
+    if type(team) ~= "table" or #team == 0 then return end
+    local aces = acesForBuild(classId, memberId)
+    if not aces then return end
+    local start = #team - #aces + 1
+    if start < 1 then start = 1 end
+    for i, spec in ipairs(aces) do
+      local mon = team[start + i - 1]
+      if type(mon) == "table" and type(mon.species) == "string" then
+        -- The mon's own stamped spec wins: it is the `pick` alternative that
+        -- was actually built, so a re-apply can never flip it to a sibling.
+        local concrete = mon.__g9sampleAceSpec
+          or concreteAceSpec(spec, mon.species)
+        if concrete then applyAceToMon(mon, concrete) end
+      end
+    end
+  end
+
+  -- The NATIVE-battle seam, both generations: BattleState:enter emits
+  -- battle.started on Gen 1 and Battle.new on Gen 2, and the enemy party is
+  -- already built and reachable as battle.enemyParty by then.  A scene fight
+  -- on Gen 1 is handled instead from the pushBattle wrap (installGen1's
+  -- tryDivert), because the custom screen builds its own view before this
+  -- event fires.
+  mod.events:on("battle.started", function(ev)
+    local battle = ev and ev.battle
+    if type(battle) ~= "table" then return end
+    local classId = battle.oppClass
+    if type(classId) ~= "string" and type(battle.trainer) == "table" then
+      classId = battle.trainer.classId or battle.trainer.class
+    end
+    if type(classId) ~= "string" then return end
+    shared.applyLeagueAceProperties(battle.enemyParty, classId,
+      battle.partyIndex)
+  end)
+
+  mod.log:info("g9_battle_sample: LEAGUE ACES installed")
 end
 
 -- Which arm to install.  GameVersion is the engine's own answer, and the same
@@ -3798,6 +5074,14 @@ return function(mod)
   -- provider, combat-type routing helpers) install first, whatever the
   -- generation -- both arms consume the same `shared` table.
   local shared = installRandomizer(mod, gen)
+  -- LEAGUE ACES is generation-agnostic too (the same party hook and the same
+  -- battle.started event on both gens), and installs from its own top-level
+  -- function to keep installRandomizer's local budget untouched.
+  local okAces, acesErr = pcall(installLeagueAces, mod, shared)
+  if not okAces then
+    mod.log:warn("g9_battle_sample: LEAGUE ACES install failed: %s",
+      tostring(acesErr))
+  end
   -- The BLACKLIST window is generation-agnostic too (one ui.options.rows hook,
   -- both gens); it reads and writes the blacklist state installRandomizer owns.
   local okBlack, blackErr = pcall(installBlacklist, mod, gen, shared)
