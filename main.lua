@@ -3105,6 +3105,22 @@ local function installGen2(mod, shared)
     return script
   end
 
+  -- The rematch question is OUR string, so the translation mod never sees it.
+  -- Localize it through g9-gui's translation layer (ui/translation.lua's
+  -- M.line), read lazily and fail-open: without g9-gui, or with the layer's
+  -- TRANSLATION option off, the English question stands unchanged.
+  local function rematchPrompt()
+    local text = "Do you want to battle again?"
+    local ok, gui = pcall(function() return mod.find and mod.find("g9-gui") end)
+    if not ok or type(gui) ~= "table" then return text end
+    local ex = gui.exports
+    local t = ex and ex.translation
+    if type(t) ~= "table" or type(t.line) ~= "function" then return text end
+    local ok2, v = pcall(t.line, text)
+    if ok2 and type(v) == "string" and v ~= "" then return v end
+    return text
+  end
+
   local nativeTalkTo = ow.talkTo
   ow.talkTo = function(world, npc)
     if shared.rematchesOn() and shared.isTrainerNpc(npc)
@@ -3112,7 +3128,7 @@ local function installGen2(mod, shared)
         and (not shared.isGymClass(shared.trainerClassOf(npc))
              or shared.gymRematchesOn()) then
       world:freezeNpc(npc)
-      world:showText("Do you want to battle again?", function()
+      world:showText(rematchPrompt(), function()
         world:askYesNo(function(yes)
           if yes then
             world:startTrainerScript(npc, REMATCH_TALK_SCRIPT, nil)
@@ -3134,7 +3150,7 @@ local function installGen2(mod, shared)
     end
     if league and gen2LeagueBeaten(world, league) then
       world:freezeNpc(npc)
-      world:showText("Do you want to battle again?", function()
+      world:showText(rematchPrompt(), function()
         world:askYesNo(function(yes)
           if yes then
             world:startTrainerScript(npc, gen2LeagueRematchScript(league), nil)
@@ -3851,7 +3867,7 @@ local function installGen1(mod, shared)
       npc.frozen = true
       self:makeNpcFacePlayer(npc)
       local function finish() npc.frozen = false end
-      Game.stack:push(TextBox.new(Game, "Do you want to battle again?", nil, {
+      Game.stack:push(TextBox.new(Game, rematchPrompt(), nil, {
         choice = function(yes)
           if yes then
             self:engageTrainer(npc, finish)
